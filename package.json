@@ -1,9 +1,18 @@
 {
   "name": "@rongmz/trading-charts",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "This is a d3 based charting library for stocks and finance world. If the question is, why another chart library? - Coz, I find no &quot;open-source&quot; library fits my requirements.",
-  "author": "rongmz",
-  "license": "MIT",
+  "author": {
+    "name": "Rounak Saha",
+    "url": "https://rongmz.in/"
+  },
+  "keywords": [
+    "charting-library",
+    "financial-charts",
+    "customized-charts",
+    "candlesticks"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rongmz/rongmz-trading-charts.git"
@@ -12,65 +21,25 @@
     "url": "https://github.com/rongmz/rongmz-trading-charts/issues"
   },
   "homepage": "https://github.com/rongmz/rongmz-trading-charts#readme",
-  "main": "dist/index.js",
-  "module": "dist/index.modern.js",
-  "source": "src/index.tsx",
   "engines": {
-    "node": ">=10"
+    "node": ">=14"
   },
   "scripts": {
-    "build": "microbundle-crl --no-compress --format modern,cjs",
-    "start": "microbundle-crl watch --no-compress --format modern,cjs",
-    "prepare": "run-s build",
-    "test": "run-s test:unit test:lint test:build",
-    "test:build": "run-s build",
-    "test:lint": "eslint .",
-    "test:unit": "cross-env CI=1 react-scripts test --env=jsdom",
-    "test:watch": "react-scripts test --env=jsdom",
-    "predeploy": "cd example && npm install && npm run build",
-    "deploy": "gh-pages -d example/build",
+    "clean": "shx rm -rf _bundles lib lib-esm",
+    "build": "npm run clean && tsc && tsc -m es6 --outDir lib-esm && webpack",
+    "local:run": "http-server -c-1 .",
     "doPublish": "npm publish --access public"
   },
-  "peerDependencies": {
-    "react": "^18.2.0"
-  },
   "dependencies": {
-    "d3": "^7.6.1",
-    "lodash": "^4.17.21"
+    "d3": "^7.8.4"
   },
   "devDependencies": {
-    "@emotion/react": "^11.10.5",
-    "@testing-library/jest-dom": "^5.16.5",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^14.4.3",
-    "@types/jest": "^29.2.0",
-    "@types/node": "^18.11.7",
-    "@types/react": "^18.0.24",
-    "@types/react-dom": "^18.0.8",
-    "@typescript-eslint/eslint-plugin": "^5.41.0",
-    "@typescript-eslint/parser": "^5.41.0",
-    "babel-eslint": "^10.0.3",
-    "cross-env": "^7.0.2",
-    "eslint": "^8.26.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-config-standard-react": "^12.0.0",
-    "eslint-plugin-import": "^2.18.2",
-    "eslint-plugin-node": "^11.0.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "eslint-plugin-promise": "^6.1.1",
-    "eslint-plugin-react": "^7.17.0",
-    "eslint-plugin-standard": "^5.0.0",
-    "gh-pages": "^4.0.0",
-    "microbundle-crl": "^0.13.10",
-    "npm-run-all": "^4.1.5",
-    "prettier": "^2.0.4",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "typescript": "4.8.4"
-  },
-  "files": [
-    "dist"
-  ]
+    "@types/d3": "^7.4.0",
+    "http-server": "^14.1.1",
+    "shx": "^0.3.4",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4",
+    "webpack": "^5.78.0",
+    "webpack-cli": "^5.0.1"
+  }
 }
