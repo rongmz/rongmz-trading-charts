@@ -19,6 +19,7 @@ const optimization = {
 
 const resolve = {
   extensions: ['.tsx', '.ts', '.js'],
+  modules: ['node_modules'],
 };
 const output = {
   path: path.resolve(__dirname, '_bundles'),
@@ -29,13 +30,13 @@ const output = {
 };
 
 module.exports = {
+  target: 'web',
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
-        exclude: /node_modules/,
-      },
+        use: 'ts-loader'
+      }
     ],
   },
   output,

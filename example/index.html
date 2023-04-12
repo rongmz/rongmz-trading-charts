@@ -4,11 +4,35 @@
 <head>
   <title>@rongmz/trading-charts</title>
   <script src="../_bundles/@rongmz/trading-charts.min.js"></script>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
 </head>
 
 <body>
   <div id="root"></div>
-
+  <script>
+    const chart = new rongmz.TradingChart(document.getElementById('root'),
+      {
+        candle: {
+          candle: {
+            type: 'candle',
+            dataId: 'candle',
+            tsValue: d => new Date(d[0]),
+            data: d => ({ o: d[1], h: d[3], l: d[2], c: d[4] }),
+            color: d => (d[1] > d[4]) ? '#e41a1c' : '#4daf4a'
+          }
+        }
+      },
+      {
+        dimension: 400
+      }
+    );
+  </script>
 </body>
 
 </html>

@@ -26,7 +26,8 @@
   },
   "scripts": {
     "clean": "shx rm -rf _bundles lib lib-esm",
-    "build": "npm run clean && tsc && tsc -m es6 --outDir lib-esm && webpack",
+    "build:webpack": "tsc && tsc -m es6 --outDir lib-esm && webpack",
+    "build": "npm run clean && npm run build:webpack",
     "local:run": "http-server -c-1 .",
     "doPublish": "npm publish --access public"
   },
