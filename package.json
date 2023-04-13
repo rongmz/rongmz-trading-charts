@@ -29,7 +29,6 @@
     "build:webpack": "tsc && tsc -m es6 --outDir lib-esm && webpack",
     "build": "npm run clean && npm run build:webpack",
     "start": "webpack serve",
-    "local:run": "http-server -c-1 .",
     "doPublish": "npm publish --access public"
   },
   "dependencies": {
