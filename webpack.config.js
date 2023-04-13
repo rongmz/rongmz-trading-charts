@@ -1,35 +1,17 @@
 // const webpack = require('webpack');
 const path = require('path');
 const { readFileSync } = require('fs');
+const HtmlWebpackPlugin = require('html-webpack-plugin')
 
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 const name = packageJson.name;
 
-const mode = 'production'
-
-const entry = {
-  [name]: './src/index.ts',
-  [`${name}.min`]: './src/index.ts',
-};
-const devtool = 'inline-source-map';
-const optimization = {
-  minimize: true,
-};
-
-const resolve = {
-  extensions: ['.tsx', '.ts', '.js'],
-  modules: ['node_modules'],
-};
-const output = {
-  path: path.resolve(__dirname, '_bundles'),
-  filename: '[name].js',
-  libraryTarget: 'umd',
-  library: name,
-  umdNamedDefine: true,
-};
-
 module.exports = {
+  entry: {
+    [name]: './src/index.ts',
+    [`${name}.min`]: './src/index.ts',
+  },
   target: 'web',
   module: {
     rules: [
@@ -39,10 +21,37 @@ module.exports = {
       }
     ],
   },
-  output,
-  resolve,
-  optimization,
-  devtool,
-  entry,
-  mode
+  output: {
+    path: path.resolve(__dirname, '_bundles'),
+    filename: '[name].js',
+    libraryTarget: 'umd',
+    library: name,
+    umdNamedDefine: true,
+  },
+  resolve: {
+    extensions: ['.tsx', '.ts', '.js'],
+    modules: ['node_modules'],
+  },
+  optimization: {
+    minimize: true,
+  },
+  devtool: 'inline-source-map',
+  mode: 'production',
+  devServer: {
+    static: {
+      directory: path.join(__dirname, 'example'),
+    },
+    compress: true,
+    port: 8080,
+    client: {
+      overlay: false,
+    },
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      title: name,
+      template: 'example/index.html',
+      scriptLoading: 'blocking'
+    })
+  ]
 }
