@@ -32,21 +32,14 @@
             },
             macd: {
               macdLine: {
-                type: 'line',
+                type: 'solid-line',
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
                 data: d => d.value.macd,
               }
             }
           },
-          {
-            candle: {
-              dimension: { width: 600, height: 200 },
-            },
-            macd: {
-              dimension: { width: 600, height: 200 }
-            }
-          }
+          { width: 1000, height: 600 }
         );
       }
     }

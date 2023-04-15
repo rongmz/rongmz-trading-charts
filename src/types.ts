@@ -3,6 +3,12 @@ export type TsOLHCVCandle = [string, number, number, number, number, number]
 export type TsValue = { ts: string, value: number }
 export type PlotData = { o: number, h: number, l: number, c: number } | number
 
+export const CLASS_SUBGRAPH = 'rongmz_subgraph'
+
+export const ZOOM_STEP = 0.01;
+export const DEAFULT_ZOOM_LEVEL = 0.5;
+export const MIN_ZOOM_POINTS = 3;
+export const X_AXIS_HEIGHT_PX = 25;
 
 /**
  * Chart config for overall chart
@@ -21,7 +27,7 @@ export interface SubGraphConfig {
 /** Data based config for each plot */
 export interface PlotConfig {
   /** Plot type */
-  type: 'line' | 'area' | 'candle' | 'bar',
+  type: 'solid-line' | 'dashed-line' | 'dotted-line' | 'area' | 'candle' | 'bar',
   /** The dataId in data */
   dataId: string,
   /** timestamp extactor in data */
@@ -36,96 +42,121 @@ export interface PlotConfig {
  * Data is provided with data id
  */
 export interface GraphData {
-  [dataId: string]: TsOLHCVCandle | TsValue
+  [dataId: string]: TsOLHCVCandle[] | TsValue[]
 }
 
-/** Graph margin
- * - if number then that value will be applied to all dims.
- */
-export type GraphMargin = {
-  top: number,
-  left: number,
-  right: number,
-  bottom: number
-}
-
-export type GraphDimension = {
-  width: number
-  height: number
-}
-
-export type GraphLabel = string | {
-  title: string,
-  subtitle: string
-}
 
 /** cosmetic settings for a sub graph */
 export interface SubGraphSettings {
-  margin?: number | GraphMargin,
-  dimension: number | GraphDimension,
-  label?: GraphLabel,
-  yScaleTitle?: string,
-  legend?: 'top-left' | 'top-center' | 'top-right',
-  autoYScale?: boolean
+  /** Graph title */
+  title: string,
+  /** y scale title */
+  yScaleTitle: string,
+  /** legend placement */
+  legend: 'top-left' | 'top-center' | 'top-right',
+  /** Width of the strokes of lines */
+  lineWidth: number,
+  /** Margin for the data plot from top */
+  dataMarginTop: number
+  /** Margin for the data plot from bottom */
+  dataMarginBottom: number,
+  /** The ratio of subgraph section compared to entire graph  */
+  scaleSectionRatio: number
 }
 
 /** Cosmetic settings for the entire Chart */
-export interface ChartSettings {
-  [yScaleId: string]: SubGraphSettings
+export interface ChartSettings extends SubGraphSettings {
+  /** Width of the entire chart */
+  width: number,
+  /** Height of the entire chart */
+  height: number,
+  /** The ratio of the chart plot portion compared to the width */
+  plotSectionRatio: number,
+  /** Color of the graph separator */
+  graphSeparatorColor: string
+  /** Cross hair line type */
+  crossHairType: 'solid' | 'dashed' | 'dotted',
+  /** Cross hair line width */
+  crossHairWidth: number,
+  /** Cross hair line color */
+  crossHairColor: string,
+  /** Background color */
+  background: string,
+  /** Grid lines to display */
+  gridLinesType: 'none' | 'vert' | 'horiz' | 'both',
+  /** Color of the grid lines - [ vert, horiz ] */
+  gridLinesColor: string | [string, string],
+  /** Color of scale lines */
+  scaleLineColor: string,
+  /** color for the scale ticks */
+  scaleFontColor: string,
+  /** Font size for the scale */
+  scaleFontSize: number,
+  /** Watermark position default: `bottom-left` */
+  watermarkPosition: 'top-left' | 'top-center' | 'top-right' | 'center' | 'bottom-left' | 'bottom-center' | 'bottom-right',
+  /** watermark text default: `""` */
+  watermarkText: string,
+  /** Individual settings for each scale sections */
+  subGraph: {
+    [scaleId: string]: SubGraphSettings
+  }
+}
+
+/** Light theme graph settings */
+export const LightThemeChartSettings: Partial<ChartSettings> = {
+  graphSeparatorColor: '#00000054',
+  crossHairType: 'dotted',
+  crossHairWidth: 1,
+  crossHairColor: '#3d3d3d',
+  background: '#FFFFFFFF',
+  gridLinesType: 'both',
+  gridLinesColor: '#00000010',
+  scaleLineColor: '#00000030',
+  scaleFontColor: '#000000',
+  scaleFontSize: 12,
+  watermarkPosition: 'bottom-left',
+  watermarkText: '',
+  title: '@rongmz/trading-charts',
+  yScaleTitle: '₹',
+  legend: 'top-left',
+  lineWidth: 2,
+  dataMarginTop: 10,
+  dataMarginBottom: 10,
+  plotSectionRatio: 0.94,
+  // scaleSectionRatio will be calculated based on scales given if not provided expicitly
+}
+
+/** Dark theme graph settings */
+export const DarkThemeChartSettings: Partial<ChartSettings> = {
+  graphSeparatorColor: '#FFFFFF54',
+  crossHairType: 'dotted',
+  crossHairWidth: 1,
+  crossHairColor: '#E8E8E8',
+  background: '#000000FF',
+  gridLinesType: 'both',
+  gridLinesColor: '#FFFFFF10',
+  scaleLineColor: '#FFFFFF30',
+  scaleFontColor: '#FFFFFF',
+  scaleFontSize: 12,
+  watermarkPosition: 'bottom-left',
+  watermarkText: '',
+  title: '@rongmz/trading-charts',
+  yScaleTitle: '₹',
+  legend: 'top-left',
+  lineWidth: 2,
+  dataMarginTop: 10,
+  dataMarginBottom: 10,
+  plotSectionRatio: 0.94,
+  // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
 
-export const DefaultSubGraphSettings = (): SubGraphSettings => ({
-  margin: 10,
-  dimension: 100,
-  autoYScale: true
-})
-
-export const isChartSettings = (settings: ChartSettings | SubGraphSettings): boolean => {
-  if (typeof (settings) === 'object') {
-    if (settings['dimension']) return false; // this is SubGraphSettings
-    else return true; // this is actually the ChartSettings
-  } else throw new Error('Invalid dimension');
-}
-
+export const debug = (...msg: any[]) => console.log(msg);
 export const log = (...msg: any[]) => console.log(msg);
 export const warn = (...msg: any[]) => console.warn(msg);
 export const error = (...msg: any[]) => console.error(msg);
 
-export const getDim = (dim: GraphDimension | number) => {
-  if (typeof (dim) === 'object') {
-    return dim as GraphDimension;
-  }
-  else return { width: dim, height: dim } as GraphDimension
-}
-
-export const getMargin = (dim?: GraphMargin | number) => {
-  if (typeof (dim) === 'object') {
-    return dim as GraphMargin;
-  }
-  else if (typeof (dim) === 'undefined') return { top: 0, left: 0, right: 0, bottom: 0 } as GraphMargin
-  else return { top: dim, left: dim, right: dim, bottom: dim } as GraphMargin
-}
-
-/** Calculate the total graph dimension */
-export const getTotalGraphDimension = (settings: ChartSettings | SubGraphSettings): GraphDimension => {
-  if (isChartSettings(settings)) {
-    let width = 0;
-    const height = Object.keys(settings as ChartSettings).reduce((height, id) => {
-      const setting = (settings as ChartSettings)[id];
-      const dim = getDim(setting.dimension);
-      const margin = getMargin(setting.margin);
-      width = Math.max(width, dim.width + margin.left + margin.right); // the max width in all sections will be the graph width
-      return height + dim.height + margin.top + margin.bottom;
-    }, 0);
-    return { width, height }
-  }
-  else {
-    const dim = getDim(settings.dimension as GraphDimension | number);
-    const margin = getMargin(settings.margin as GraphMargin | number);
-    return {
-      width: dim.width + margin.left + margin.right,
-      height: dim.height + margin.top + margin.bottom
-    }
-  }
+export type Interpolator<K, V> = (t: K) => V
+export interface CanvasMap {
+  [scaleId: string]: HTMLCanvasElement
 }

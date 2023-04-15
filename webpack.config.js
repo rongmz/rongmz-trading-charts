@@ -10,7 +10,7 @@ const name = packageJson.name;
 module.exports = {
   entry: {
     [name]: './src/index.ts',
-    [`${name}.min`]: './src/index.ts',
+    // [`${name}.min`]: './src/index.ts', // uncomment for prod
   },
   target: 'web',
   module: {
