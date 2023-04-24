@@ -390,7 +390,7 @@ export class TradingChart {
               if (color) colorMat.push(typeof (color) === 'function' ? color(_) : color)
               else colorMat.push(this.defaults.colorPallet[i % this.defaults.colorPallet.length])
             });
-            rv[plotName] = { type, dataId, tsValue: tsValueMat, data: dataMat, color: colorMat, baseY: baseY || canvasHeight };
+            rv[plotName] = { type, dataId, tsValue: tsValueMat, data: dataMat, color: colorMat, baseY };
             // calculate domains as well
             yScaleDomain[0] = d3.min(dataMat, d => (typeof (d) === 'object' ? d.l : d)) as number;
             yScaleDomain[1] = d3.max(dataMat, d => (typeof (d) === 'object' ? d.h : d)) as number;
@@ -463,9 +463,10 @@ export class TradingChart {
             //--------------area plot------------
             case 'area':
               const color = d3.color(plotConfig.color[0]) as d3.RGBColor | d3.HSLColor;
+              debug(typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight))
               drawArea(mainCanvasCtx, color.formatHex8(), (subGraphSettings.lineWidth || this.settings.lineWidth),
                 [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()],
-                plotConfig.baseY,
+                typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight),
                 (plotConfig.data as number[]).map((d, i) => {
                   const x = d3xScale(plotConfig.tsValue[i]) as number;
                   const y = d3yScale(d);

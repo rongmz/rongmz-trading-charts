@@ -44,7 +44,6 @@
               macdLine: {
                 type: 'dashed-line',
                 dataId: 'macd',
-                lineWidth: 1,
                 tsValue: d => new Date(d.ts),
                 data: d => d.v,
               }
@@ -55,7 +54,7 @@
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
                 data: d => d.v,
-                // baseY: 0
+                baseY: -0.05
               }
             }
           },

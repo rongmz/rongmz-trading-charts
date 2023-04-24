@@ -57,7 +57,7 @@ export interface PlotMatConfig {
   /** data extractor */
   data: PlotData[],
   /** Only for area plot, the base Y value of the plot */
-  baseY: number,
+  baseY?: number,
   /** Dynamic coloring based on each value or overall coloring */
   color: string[],
 }
