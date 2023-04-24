@@ -1,12 +1,13 @@
 
 export type TsOLHCVCandle = [string, number, number, number, number, number]
-export type TsValue = { ts: string, value: number }
-export type PlotData = { o: number, h: number, l: number, c: number } | number
+export type TsValue = { ts: string, v: number }
+export type CandlePlotData = { o: number, h: number, l: number, c: number };
+export type PlotData = CandlePlotData | number
 
 export const CLASS_SUBGRAPH = 'rongmz_subgraph'
 
 export const ZOOM_STEP = 0.01;
-export const DEAFULT_ZOOM_LEVEL = 0.5;
+export const DEAFULT_ZOOM_LEVEL = 0.8;
 export const MIN_ZOOM_POINTS = 3;
 export const X_AXIS_HEIGHT_PX = 25;
 
@@ -24,18 +25,41 @@ export interface SubGraphConfig {
   [plotName: string]: PlotConfig
 }
 
+export type PlotLineType = 'solid-line' | 'dashed-line' | 'dotted-line'
+
 /** Data based config for each plot */
 export interface PlotConfig {
   /** Plot type */
-  type: 'solid-line' | 'dashed-line' | 'dotted-line' | 'area' | 'candle' | 'bar',
+  type: PlotLineType | 'area' | 'candle' | 'bar',
   /** The dataId in data */
   dataId: string,
-  /** timestamp extactor in data */
+  /** timestamp extactor in data timestamp will be in string */
   tsValue: (data: TsOLHCVCandle | TsValue) => Date,
   /** data extractor */
   data: (data: TsOLHCVCandle | TsValue) => PlotData,
+  /** Only for area plot, the base Y value of the plot */
+  baseY?: number,
   /** Dynamic coloring based on each value or overall coloring */
   color?: string | ((data: TsOLHCVCandle | TsValue) => string),
+}
+
+export interface SubGraphMatConfig {
+  [plotName: string]: PlotMatConfig
+}
+
+export interface PlotMatConfig {
+  /** Plot type */
+  type: PlotLineType | 'area' | 'candle' | 'bar',
+  /** The dataId in data */
+  dataId: string,
+  /** timestamp extactor in data */
+  tsValue: Date[],
+  /** data extractor */
+  data: PlotData[],
+  /** Only for area plot, the base Y value of the plot */
+  baseY: number,
+  /** Dynamic coloring based on each value or overall coloring */
+  color: string[],
 }
 
 /**
@@ -61,7 +85,9 @@ export interface SubGraphSettings {
   /** Margin for the data plot from bottom */
   dataMarginBottom: number,
   /** The ratio of subgraph section compared to entire graph  */
-  scaleSectionRatio: number
+  scaleSectionRatio: number,
+  /** The delta height changed due to section resizing */
+  deltaHeight: number,
 }
 
 /** Cosmetic settings for the entire Chart */
@@ -158,5 +184,31 @@ export const error = (...msg: any[]) => console.error(msg);
 
 export type Interpolator<K, V> = (t: K) => V
 export interface CanvasMap {
-  [scaleId: string]: HTMLCanvasElement
+  [scaleId: string]: d3.Selection<HTMLCanvasElement, any, any, any>
+}
+
+export interface ScaleRowMap {
+  [scaleId: string]: d3.Selection<HTMLTableCellElement, any, any, any>[]
+}
+
+export interface MousePosition {
+  x: number,
+  y: number,
+  canvas?: HTMLCanvasElement
+}
+
+export const getLineDash = (type: 'solid' | 'dashed' | 'dotted') => {
+  switch (type) {
+    case 'solid':
+      return [16, 0];
+    case 'dashed':
+      return [4, 16];
+    case 'dotted':
+      return [2, 2];
+  }
+}
+
+
+export interface YCoordinateMap<T> {
+  [range: string]: T
 }

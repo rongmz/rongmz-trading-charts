@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>@rongmz/trading-charts</title>
   <!-- <script src="../_bundles/@rongmz/trading-charts.min.js"></script> -->
   <style>
@@ -30,17 +31,45 @@
                 color: d => (d[1] > d[4]) ? '#e41a1c' : '#4daf4a'
               }
             },
+            volume: {
+              volume: {
+                type: 'bar',
+                dataId: 'candle',
+                tsValue: d => new Date(d[0]),
+                data: d => d[5],
+                color: d => (d[1] > d[4]) ? '#e41a1c90' : '#4daf4a90'
+              }
+            },
             macd: {
               macdLine: {
-                type: 'solid-line',
+                type: 'dashed-line',
+                dataId: 'macd',
+                lineWidth: 1,
+                tsValue: d => new Date(d.ts),
+                data: d => d.v,
+              }
+            },
+            macdArea: {
+              macdLine: {
+                type: 'area',
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
-                data: d => d.value.macd,
+                data: d => d.v,
+                // baseY: 0
               }
             }
           },
-          { width: 1000, height: 600 }
+          { width: 1000, height: 700 }
         );
+        // fetch data and set
+        fetch("/data.json", {
+          "headers": { "accept": "application/json" },
+          "method": "GET"
+        }).then(res => res.json())
+          .then(data => {
+            console.log('data=', data);
+            chart.setData(data);
+          })
       }
     }
     checkLoadComplete();

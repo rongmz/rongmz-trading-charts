@@ -42,7 +42,7 @@ module.exports = {
       directory: path.join(__dirname, 'example'),
     },
     compress: true,
-    port: 8080,
+    port: 1000,
     client: {
       overlay: false,
     },
