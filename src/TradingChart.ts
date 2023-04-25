@@ -6,7 +6,7 @@ import {
   YCoordinateMap,
   ZOOM_STEP, debug, error, getLineDash, log
 } from './types';
-import { drawArea, drawBar, drawCandle, drawLine } from './utils';
+import { clearCanvas, drawArea, drawBar, drawCandle, drawLine } from './utils';
 
 declare global {
   interface String {
@@ -410,6 +410,16 @@ export class TradingChart {
           [canvasHeight, 0]
         );
         const d3xScale = d3.scaleBand(xScaleDomain, [0, canvasWidth]).padding(this.defaults.xScalePadding);
+
+        const mainCanvasCtx = canvas.getContext('2d') as CanvasRenderingContext2D;
+        const yScaleCanvasCtx = yScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
+
+
+        // clear canvas before drawing
+        clearCanvas(mainCanvasCtx, 0, 0, canvasWidth, canvasHeight);
+        clearCanvas(yScaleCanvasCtx, 0, 0, yScaleCanvasWidth, yScaleCanvasHeight);
+
+
         // -----------------------------------START: Draw Axis------------------------------------------------
         // const d3xAxis = d3.axisBottom(d3xScale).tickFormat((v, i) => {
         //   const hh = v.getHours(), mm = v.getMinutes();
@@ -423,7 +433,6 @@ export class TradingChart {
         // -----------------------------------END: Draw Axis------------------------------------------------
 
         // -----------------------------------START: Draw Plot------------------------------------------------
-        const mainCanvasCtx = canvas.getContext('2d') as CanvasRenderingContext2D;
         debug('matSubGraphConfig', matSubGraphConfig)
         Object.keys(matSubGraphConfig).map(plotName => {
           const plotConfig = matSubGraphConfig[plotName];
@@ -460,13 +469,23 @@ export class TradingChart {
               });
               break;
 
+            //--------------var bar plot------------
+            case 'var-bar':
+              const baseY = typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight;
+              (plotConfig.data as number[]).map((d, i) => {
+                const x = d3xScale(plotConfig.tsValue[i]) as number;
+                const y = d3yScale(d);
+                drawBar(mainCanvasCtx, plotConfig.color[i], x, y, bandW, baseY - y);
+              });
+              break;
+
             //--------------area plot------------
             case 'area':
               const color = d3.color(plotConfig.color[0]) as d3.RGBColor | d3.HSLColor;
-              debug(typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight))
+              // debug(typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight))
               drawArea(mainCanvasCtx, color.formatHex8(), (subGraphSettings.lineWidth || this.settings.lineWidth),
                 [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()],
-                typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight),
+                typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight,
                 (plotConfig.data as number[]).map((d, i) => {
                   const x = d3xScale(plotConfig.tsValue[i]) as number;
                   const y = d3yScale(d);

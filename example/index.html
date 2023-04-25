@@ -46,6 +46,15 @@
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
                 data: d => d.v,
+                color: 'red',
+              },
+              macdLineBar: {
+                type: 'var-bar',
+                dataId: 'macd',
+                tsValue: d => new Date(d.ts),
+                data: d => d.v,
+                color: d => (d.v> -0.05) ? '#e41a1c90' : '#4daf4a90',
+                baseY: -0.05,
               }
             },
             macdArea: {
@@ -54,7 +63,7 @@
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
                 data: d => d.v,
-                baseY: -0.05
+                // baseY: -0.05
               }
             }
           },

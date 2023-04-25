@@ -49,7 +49,7 @@ export interface SubGraphMatConfig {
 
 export interface PlotMatConfig {
   /** Plot type */
-  type: PlotLineType | 'area' | 'candle' | 'bar',
+  type: PlotLineType | 'area' | 'candle' | 'bar' | 'var-bar',
   /** The dataId in data */
   dataId: string,
   /** timestamp extactor in data */

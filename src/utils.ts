@@ -9,7 +9,7 @@ import { PlotLineType, debug } from "./types";
  * @param h
  * @param color
  */
-export function clearCanvas(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+export function clearCanvas(context: CanvasRenderingContext2D | null, x: number, y: number, w: number, h: number) {
   // console.log('clear canvas area', x, y, w, h, color);
   if (context !== null) {
     context.save();
@@ -31,7 +31,7 @@ export function clearCanvas(context: CanvasRenderingContext2D, x: number, y: num
  * @param bw candle width
  * @param sw shadow line width deafult: 1
  */
-export function drawCandle(context: CanvasRenderingContext2D, color: string,
+export function drawCandle(context: CanvasRenderingContext2D | null, color: string,
   ocx: number, oy: number, cy: number, hlx: number, hy: number, ly: number, bw: number, sw: number = 1) {
   // console.log('clear canvas area', x, y, w, h, color);
   if (context !== null) {
@@ -53,7 +53,7 @@ export function drawCandle(context: CanvasRenderingContext2D, color: string,
  * @param w
  * @param h
  */
-export function drawBar(context: CanvasRenderingContext2D, color: string, x: number, y: number, w: number, h: number) {
+export function drawBar(context: CanvasRenderingContext2D | null, color: string, x: number, y: number, w: number, h: number) {
   if (context !== null) {
     context.save();
     context.fillStyle = color;
@@ -70,7 +70,7 @@ export function drawBar(context: CanvasRenderingContext2D, color: string, x: num
  * @param lineWidth
  * @param coordinates The [x,y] array of points
  */
-export function drawLine(context: CanvasRenderingContext2D, color: string, lineType: PlotLineType, lineWidth: number, coordinates: number[][]) {
+export function drawLine(context: CanvasRenderingContext2D | null, color: string, lineType: PlotLineType, lineWidth: number, coordinates: number[][]) {
   if (context !== null && coordinates.length > 1) {
     context.save();
     context.lineWidth = lineWidth;
@@ -102,7 +102,7 @@ export function drawLine(context: CanvasRenderingContext2D, color: string, lineT
  * @param baseY area base line y
  * @param coordinates
  */
-export function drawArea(context: CanvasRenderingContext2D, lineColor: string, lineWidth: number,
+export function drawArea(context: CanvasRenderingContext2D | null, lineColor: string, lineWidth: number,
   areaColors: string[], baseY: number, coordinates: number[][]) {
   if (context !== null && coordinates.length > 1) {
     context.save();
