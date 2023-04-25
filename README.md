@@ -12,18 +12,8 @@ npm install @rongmz/trading-charts
 
 ## Usage
 
-```tsx
-import React, { Component } from 'react'
-
-import MyComponent from '@rongmz/trading-charts'
-
-class Example extends Component {
-  render() {
-    return <MyComponent />
-  }
-}
-```
+See [example.html](https://github.com/rongmz/rongmz-trading-charts/tree/master/example/index.html)
 
 ## License
 
-MIT © [rongmz](https://github.com/rongmz)
+Apache License 2.0 © [rongmz](https://github.com/rongmz) 2023
