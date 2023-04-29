@@ -1,12 +1,12 @@
 import * as d3 from 'd3';
 import {
-  CLASS_SUBGRAPH, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, DEAFULT_ZOOM_LEVEL, DarkThemeChartSettings, GraphData, Interpolator,
+  CLASS_SUBGRAPH, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DEAFULT_ZOOM_LEVEL, DarkThemeChartSettings, GraphData, Interpolator,
   LightThemeChartSettings, MIN_ZOOM_POINTS, MousePosition, PlotData, PlotLineType, PlotMatConfig, ScaleRowMap, SubGraphMatConfig, SubGraphSettings,
   X_AXIS_HEIGHT_PX,
   YCoordinateMap,
   ZOOM_STEP, debug, error, getLineDash, log
 } from './types';
-import { clearCanvas, drawArea, drawBar, drawCandle, drawLine } from './utils';
+import { clearCanvas, drawArea, drawBar, drawCandle, drawGridLine, drawLine, drawText } from './utils';
 
 declare global {
   interface String {
@@ -51,8 +51,8 @@ export class TradingChart {
   private scaleYCanvasMap: CanvasMap = {};
   private scaleYUpdateCanvasMap: CanvasMap = {};
 
-  private scaleXCanvas: HTMLCanvasElement;
-  private scaleXUpdateCanvas: HTMLCanvasElement;
+  private scaleXCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+  private scaleXUpdateCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
 
   private zoomLevel: number = this.defaults.zoomLevel;
   private zoomInterpolator: Interpolator<number, number> = d3.interpolateNumber(0, 0);
@@ -60,6 +60,10 @@ export class TradingChart {
 
   private currentMousePosition: MousePosition = { x: 0, y: 0 }
   private canvasYCoordinateMap: YCoordinateMap<d3.Selection<HTMLCanvasElement, any, any, any>> = {}
+
+  private d3xScale = d3.scaleBand<Date>();
+  private d3yScaleMap: D3YScaleMap = {};
+
 
   /**
    * Instantiate a TradingChart
@@ -272,7 +276,7 @@ export class TradingChart {
       position: absolute;
       left: 0px;
       top: 0px;
-    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel()).node() as HTMLCanvasElement;
+    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel());
     this.scaleXUpdateCanvas = xdiv.append('canvas').attr('class', `scaleXUpdateCanvas`).attr('style', `
       user-select: none;
       -webkit-tap-highlight-color: transparent;
@@ -283,7 +287,7 @@ export class TradingChart {
       top: 0px;
       z-index: 1;
       cursor: ew-resize;
-    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel()).node() as HTMLCanvasElement;
+    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel());
 
     // place holder for botttom right corner
     tr.append('td').attr('style', `
@@ -363,6 +367,29 @@ export class TradingChart {
     // If there is data then only main graph will be drawn
     if (this.windowedData) {
       debug('Chart Data', this.windowedData);
+      const xScaleDomainSet = new Set<number>() // merged with all plots
+
+      const xScaleCanvas = this.scaleXCanvas.node() as HTMLCanvasElement;
+      const xScaleCanvasWidth = +this.scaleXCanvas.attr('width');
+      const xScaleCanvasHeight = +this.scaleXCanvas.attr('height');
+
+      const xScaleCanvasCtx = xScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
+      // clear canvas
+      clearCanvas(xScaleCanvasCtx, 0, 0, xScaleCanvasWidth, xScaleCanvasHeight);
+      // assumed text dim
+      xScaleCanvasCtx.font = this.settings.scaleFontSize;
+      xScaleCanvasCtx.textAlign = 'center';
+      const textMeasurement = xScaleCanvasCtx.measureText('77:77');
+      const xscaleY = xScaleCanvasHeight / 2;
+
+      const callOnXTicks = (direction: 'forward' | 'backward', fn: (d: Date, i: number, _: Date[]) => void) => {
+        const domain = this.d3xScale.domain();
+        for (let i = 0; i < domain.length; i++) {
+          const j = (direction === 'backward') ? domain.length - 1 - i : i;
+          if (i % this.settings.xGridInterval === 0) fn(domain[j], i, domain);
+        }
+      }
+
       Object.keys(this.config).map(scaleId => {
         const subgraphConfig = this.config[scaleId];
 
@@ -375,7 +402,6 @@ export class TradingChart {
         const yScaleCanvasHeight = +this.scaleYCanvasMap[scaleId].attr('height');
 
         // now plot with every configured plot
-        const xScaleDomainSet = new Set<number>() // merged with all plots
         const yScaleDomain: number[] = []; // <-- y scale domain
 
         const matSubGraphConfig = Object.keys(subgraphConfig).reduce((rv, plotName, i) => {
@@ -400,16 +426,19 @@ export class TradingChart {
           return rv;
         }, {} as SubGraphMatConfig);
 
-        // extract xScaleDomain as date
-        const xScaleDomain = Array.from(xScaleDomainSet).map(_ => new Date(_)).sort((a, b) => (a.getTime() - b.getTime())); // <-- x scale domain
-
         // draw scales
         const yScaleDomainPaddingLength = (yScaleDomain[1] - yScaleDomain[0]) * this.defaults.yScalePaddingPct;
-        const d3yScale = d3.scaleLinear(
-          [yScaleDomain[0] - yScaleDomainPaddingLength, yScaleDomain[1] + yScaleDomainPaddingLength],
-          [canvasHeight, 0]
-        );
-        const d3xScale = d3.scaleBand(xScaleDomain, [0, canvasWidth]).padding(this.defaults.xScalePadding);
+        if (!this.d3yScaleMap[scaleId]) this.d3yScaleMap[scaleId] = d3.scaleLinear();
+        this.d3yScaleMap[scaleId]
+          .domain([yScaleDomain[0] - yScaleDomainPaddingLength, yScaleDomain[1] + yScaleDomainPaddingLength])
+          .range([canvasHeight, 0]);
+        const d3yScale = this.d3yScaleMap[scaleId];
+
+        const xScaleDomain = Array.from(xScaleDomainSet).map(_ => new Date(_)).sort((a, b) => (a.getTime() - b.getTime())); // <-- x scale domain
+        this.d3xScale
+          .domain(xScaleDomain)
+          .range([0, xScaleCanvasWidth])
+          .padding(this.defaults.xScalePadding);
 
         const mainCanvasCtx = canvas.getContext('2d') as CanvasRenderingContext2D;
         const yScaleCanvasCtx = yScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
@@ -419,31 +448,19 @@ export class TradingChart {
         clearCanvas(mainCanvasCtx, 0, 0, canvasWidth, canvasHeight);
         clearCanvas(yScaleCanvasCtx, 0, 0, yScaleCanvasWidth, yScaleCanvasHeight);
 
-
-        // -----------------------------------START: Draw Axis------------------------------------------------
-        // const d3xAxis = d3.axisBottom(d3xScale).tickFormat((v, i) => {
-        //   const hh = v.getHours(), mm = v.getMinutes();
-        //   if (i === 0 || (hh === this.defaults.marketStartTime[0] && mm === this.defaults.marketStartTime[1]))
-        //     return `${v.getDate()}/${v.getMonth() + 1}`
-        //   else
-        //     return `${hh}:${`0${mm}`.slice(-2)}`;
-        // })
-        // //.tickValues(); // <-- zoom specific ticks to be calculated
-        // const d3yAxis = d3.axisLeft(d3yScale).ticks(40, d3.format("~s"));
         // -----------------------------------END: Draw Axis------------------------------------------------
 
         // -----------------------------------START: Draw Plot------------------------------------------------
-        debug('matSubGraphConfig', matSubGraphConfig)
         Object.keys(matSubGraphConfig).map(plotName => {
           const plotConfig = matSubGraphConfig[plotName];
           const subGraphSettings = (this.settings.subGraph || {})[scaleId] || {};
-          const bandW = d3xScale.bandwidth();
+          const bandW = this.d3xScale.bandwidth();
           switch (plotConfig.type) {
 
             //--------------Candle plot------------
             case 'candle':
               (plotConfig.data as CandlePlotData[]).map((d, i) => {
-                const x = d3xScale(plotConfig.tsValue[i]) as number;
+                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
                 drawCandle(mainCanvasCtx, plotConfig.color[i], x, d3yScale(d.o), d3yScale(d.c), x + bandW / 2, d3yScale(d.h), d3yScale(d.l), bandW)
               });
               break;
@@ -454,7 +471,7 @@ export class TradingChart {
             case 'solid-line':
               drawLine(mainCanvasCtx, plotConfig.color[0], plotConfig.type as PlotLineType,
                 (subGraphSettings.lineWidth || this.settings.lineWidth), (plotConfig.data as number[]).map((d, i) => {
-                  const x = d3xScale(plotConfig.tsValue[i]) as number;
+                  const x = this.d3xScale(plotConfig.tsValue[i]) as number;
                   const y = d3yScale(d);
                   return [x + bandW / 2, y];
                 }));
@@ -463,7 +480,7 @@ export class TradingChart {
             //--------------bar plot------------
             case 'bar':
               (plotConfig.data as number[]).map((d, i) => {
-                const x = d3xScale(plotConfig.tsValue[i]) as number;
+                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
                 const y = d3yScale(d);
                 drawBar(mainCanvasCtx, plotConfig.color[i], x, y, bandW, canvasHeight - y);
               });
@@ -473,7 +490,7 @@ export class TradingChart {
             case 'var-bar':
               const baseY = typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight;
               (plotConfig.data as number[]).map((d, i) => {
-                const x = d3xScale(plotConfig.tsValue[i]) as number;
+                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
                 const y = d3yScale(d);
                 drawBar(mainCanvasCtx, plotConfig.color[i], x, y, bandW, baseY - y);
               });
@@ -487,20 +504,59 @@ export class TradingChart {
                 [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()],
                 typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight,
                 (plotConfig.data as number[]).map((d, i) => {
-                  const x = d3xScale(plotConfig.tsValue[i]) as number;
+                  const x = this.d3xScale(plotConfig.tsValue[i]) as number;
                   const y = d3yScale(d);
                   return [x + bandW / 2, y];
                 }));
               break;
-
           }
-
         })
         // -----------------------------------END: Draw Plot------------------------------------------------
 
+        // -----------------------------------START: Draw Grid Lines------------------------------------------------
+        // if (this.settings.gridLinesType !== 'none') {
+        //   // x grid lines
+        //   callOnXTicks('backward', (d, i, _) => {
+        //     const x = this.d3xScale(d) as number;
+        //     const color = typeof (this.settings.gridLinesColor) === 'string' ? this.settings.gridLinesColor as string : this.settings.gridLinesColor[0];
+        //     drawGridLine(mainCanvasCtx, color, x, 0, 0, canvasHeight, this.settings.gridLinesType as 'vert');
+        //   });
+        // }
+        // -----------------------------------END: Draw Grid Lines------------------------------------------------
 
+        // -----------------------------------START: Draw y Scale------------------------------------------------
+        const yScaleTicksCount = ((this.settings.subGraph || {})[scaleId] || {}).yScaleTickCount || this.settings.yScaleTickCount;
+        const ticks = d3yScale.ticks(yScaleTicksCount);
+        const yScaleDomainSize = d3yScale.domain().reduce((rv, d, i, _) => {
+          if (i === 0) rv = d;
+          else if (i === _.length - 1) {
+            return Math.abs(rv - d);
+          }
+          return rv;
+        }, 0)
+        const tickFormat = (yScaleDomainSize > 1000) ? d3yScale.tickFormat(yScaleTicksCount, '~s') :
+          (yScaleDomainSize < 10) ? d3yScale.tickFormat(yScaleTicksCount, '.2~f') : d3yScale.tickFormat(yScaleTicksCount, 'd');
+
+        ticks.map((tick, i, _) => {
+          const y = d3yScale(tick);
+          drawText(yScaleCanvasCtx, tickFormat(tick), 1, y, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
+        })
+        // -----------------------------------END: Draw y Scale------------------------------------------------
 
       });
+
+      // ----------------Draw X axis-----------------------
+      callOnXTicks('forward', (d, i, _) => {
+        const hh = d.getHours(), mm = d.getMinutes();
+        let text = '';
+        if (i === 0 || (hh === this.defaults.marketStartTime[0] && mm === this.defaults.marketStartTime[1]))
+          text = `${d.getDate()}/${d.getMonth() + 1}`
+        else text = `${hh}:${`0${mm}`.slice(-2)}`;
+        const x = this.d3xScale(d) as number;
+        drawText(xScaleCanvasCtx, text, (i === _.length - 1) ? x - textMeasurement.width : x, xscaleY,
+          0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
+      });
+
     }
   }
 

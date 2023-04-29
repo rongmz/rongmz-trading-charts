@@ -134,4 +134,55 @@ export function drawArea(context: CanvasRenderingContext2D | null, lineColor: st
   }
 }
 
+/**
+ * Draws text
+ * @param context
+ * @param color
+ * @param x
+ * @param y
+ * @param maxWidth
+ */
+export function drawText(context: CanvasRenderingContext2D | null, text: string, x: number, y: number,
+  maxWidth?: number, color?: string, font?: string, align?: CanvasTextAlign, baseline?: CanvasTextBaseline, direction?: CanvasDirection) {
+  if (context !== null) {
+    context.save();
+    if (align) context.textAlign = align;
+    if (font) context.font = font;
+    if (baseline) context.textBaseline = baseline;
+    if (direction) context.direction = direction;
+    if (color) context.fillStyle = color;
+    if(!maxWidth) {
+      const m = context.measureText(text);
+      maxWidth = m.width;
+    }
+    context.fillText(text, x, y, maxWidth);
+    context.restore();
+  }
+}
 
+/**
+ * Draw grid lines
+ * @param context
+ * @param x
+ * @param y
+ * @param w
+ * @param h
+ * @param type
+ */
+export function drawGridLine(context: CanvasRenderingContext2D | null, color: string, x: number, y: number, w: number, h: number, type: 'vert' | 'horiz' | 'both') {
+  if (context !== null) {
+    context.save();
+    context.lineWidth = 1;
+    context.strokeStyle = color;
+    if (['both', 'vert'].indexOf(type) > -1) {
+      context.moveTo(x, 0);
+      context.lineTo(x, h);
+    }
+    if (['both', 'horiz'].indexOf(type) > -1) {
+      context.moveTo(0, y);
+      context.lineTo(0, w);
+    }
+    context.stroke();
+    context.restore();
+  }
+}

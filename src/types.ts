@@ -76,6 +76,8 @@ export interface SubGraphSettings {
   title: string,
   /** y scale title */
   yScaleTitle: string,
+  /** Ticks count for y scale */
+  yScaleTickCount: number,
   /** legend placement */
   legend: 'top-left' | 'top-center' | 'top-right',
   /** Width of the strokes of lines */
@@ -112,12 +114,14 @@ export interface ChartSettings extends SubGraphSettings {
   gridLinesType: 'none' | 'vert' | 'horiz' | 'both',
   /** Color of the grid lines - [ vert, horiz ] */
   gridLinesColor: string | [string, string],
+  /** The gap band of two grids */
+  xGridInterval: number,
   /** Color of scale lines */
   scaleLineColor: string,
   /** color for the scale ticks */
   scaleFontColor: string,
   /** Font size for the scale */
-  scaleFontSize: number,
+  scaleFontSize: string,
   /** Watermark position default: `bottom-left` */
   watermarkPosition: 'top-left' | 'top-center' | 'top-right' | 'center' | 'bottom-left' | 'bottom-center' | 'bottom-right',
   /** watermark text default: `""` */
@@ -137,9 +141,10 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   background: '#FFFFFFFF',
   gridLinesType: 'both',
   gridLinesColor: '#00000010',
+  xGridInterval: 15,
   scaleLineColor: '#00000030',
   scaleFontColor: '#000000',
-  scaleFontSize: 12,
+  scaleFontSize: '12px Arial',
   watermarkPosition: 'bottom-left',
   watermarkText: '',
   title: '@rongmz/trading-charts',
@@ -149,6 +154,7 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   dataMarginTop: 10,
   dataMarginBottom: 10,
   plotSectionRatio: 0.94,
+  yScaleTickCount: 5
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -161,9 +167,10 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   background: '#000000FF',
   gridLinesType: 'both',
   gridLinesColor: '#FFFFFF10',
+  xGridInterval: 15,
   scaleLineColor: '#FFFFFF30',
   scaleFontColor: '#FFFFFF',
-  scaleFontSize: 12,
+  scaleFontSize: '12px Arial',
   watermarkPosition: 'bottom-left',
   watermarkText: '',
   title: '@rongmz/trading-charts',
@@ -173,6 +180,7 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   dataMarginTop: 10,
   dataMarginBottom: 10,
   plotSectionRatio: 0.94,
+  yScaleTickCount: 5
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -211,4 +219,8 @@ export const getLineDash = (type: 'solid' | 'dashed' | 'dotted') => {
 
 export interface YCoordinateMap<T> {
   [range: string]: T
+}
+
+export interface D3YScaleMap {
+  [scaleId: string]: d3.ScaleLinear<number, number>
 }

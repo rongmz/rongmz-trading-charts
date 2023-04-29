@@ -29,6 +29,13 @@
                 tsValue: d => new Date(d[0]),
                 data: d => ({ o: d[1], h: d[3], l: d[2], c: d[4] }),
                 color: d => (d[1] > d[4]) ? '#e41a1c' : '#4daf4a'
+              },
+              hlc: {
+                type: 'solid-line',
+                dataId: 'candle',
+                tsValue: d => new Date(d[0]),
+                data: d => (d[4] + d[3] - d[2]),
+                color: 'blue',
               }
             },
             volume: {
@@ -53,7 +60,7 @@
                 dataId: 'macd',
                 tsValue: d => new Date(d.ts),
                 data: d => d.v,
-                color: d => (d.v> -0.05) ? '#e41a1c90' : '#4daf4a90',
+                color: d => (d.v > -0.05) ? '#e41a1c90' : '#4daf4a90',
                 baseY: -0.05,
               }
             },
@@ -67,7 +74,7 @@
               }
             }
           },
-          { width: 1000, height: 700 }
+          { width: 1000, height: 700, candle: { lineWidth: 1 } }
         );
         // fetch data and set
         fetch("/data.json", {
