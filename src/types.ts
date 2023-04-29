@@ -74,18 +74,24 @@ export interface GraphData {
 export interface SubGraphSettings {
   /** Graph title */
   title: string,
+  /** sub graph title font size */
+  titleFontSize: string,
+  /** sub graph title color */
+  titleFontColor: string,
   /** y scale title */
   yScaleTitle: string,
   /** Ticks count for y scale */
   yScaleTickCount: number,
+  /** the d3 format specifier for y scale. */
+  yScaleFormat: string,
   /** legend placement */
   legend: 'top-left' | 'top-center' | 'top-right',
+  /** legend font size */
+  legendFontSize: string,
+  /** Margin for legend placing */
+  legendMargin: [number, number, number] | number,
   /** Width of the strokes of lines */
   lineWidth: number,
-  /** Margin for the data plot from top */
-  dataMarginTop: number
-  /** Margin for the data plot from bottom */
-  dataMarginBottom: number,
   /** The ratio of subgraph section compared to entire graph  */
   scaleSectionRatio: number,
   /** The delta height changed due to section resizing */
@@ -116,14 +122,14 @@ export interface ChartSettings extends SubGraphSettings {
   gridLinesColor: string | [string, string],
   /** The gap band of two grids */
   xGridInterval: number,
+  /** xscale format */
+  xScaleFormat: string,
   /** Color of scale lines */
   scaleLineColor: string,
   /** color for the scale ticks */
   scaleFontColor: string,
   /** Font size for the scale */
   scaleFontSize: string,
-  /** Watermark position default: `bottom-left` */
-  watermarkPosition: 'top-left' | 'top-center' | 'top-right' | 'center' | 'bottom-left' | 'bottom-center' | 'bottom-right',
   /** watermark text default: `""` */
   watermarkText: string,
   /** Individual settings for each scale sections */
@@ -145,16 +151,14 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   scaleLineColor: '#00000030',
   scaleFontColor: '#000000',
   scaleFontSize: '12px Arial',
-  watermarkPosition: 'bottom-left',
   watermarkText: '',
   title: '@rongmz/trading-charts',
   yScaleTitle: '₹',
   legend: 'top-left',
   lineWidth: 2,
-  dataMarginTop: 10,
-  dataMarginBottom: 10,
   plotSectionRatio: 0.94,
-  yScaleTickCount: 5
+  yScaleTickCount: 5,
+  legendMargin: 10,
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -171,16 +175,14 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   scaleLineColor: '#FFFFFF30',
   scaleFontColor: '#FFFFFF',
   scaleFontSize: '12px Arial',
-  watermarkPosition: 'bottom-left',
   watermarkText: '',
   title: '@rongmz/trading-charts',
   yScaleTitle: '₹',
   legend: 'top-left',
   lineWidth: 2,
-  dataMarginTop: 10,
-  dataMarginBottom: 10,
   plotSectionRatio: 0.94,
-  yScaleTickCount: 5
+  yScaleTickCount: 5,
+  legendMargin: 10,
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 

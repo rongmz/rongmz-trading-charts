@@ -151,7 +151,7 @@ export function drawText(context: CanvasRenderingContext2D | null, text: string,
     if (baseline) context.textBaseline = baseline;
     if (direction) context.direction = direction;
     if (color) context.fillStyle = color;
-    if(!maxWidth) {
+    if (!maxWidth) {
       const m = context.measureText(text);
       maxWidth = m.width;
     }
@@ -159,6 +159,22 @@ export function drawText(context: CanvasRenderingContext2D | null, text: string,
     context.restore();
   }
 }
+
+export function drawCenterPivotRotatedText(context: CanvasRenderingContext2D | null, text: string, x: number, y: number, angleDegree: number,
+  color?: string, font?: string) {
+  if (context !== null) {
+    context.save();
+    if (font) context.font = font;
+    if (color) context.fillStyle = color;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.translate(x, y);
+    context.rotate(angleDegree * Math.PI / 180);
+    context.fillText(text, 0, 0)
+    context.restore();
+  }
+}
+
 
 /**
  * Draw grid lines

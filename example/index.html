@@ -74,7 +74,19 @@
               }
             }
           },
-          { width: 1000, height: 700, candle: { lineWidth: 1 } }
+          {
+            width: 1000, height: 700, watermarkText: '@rongmz/trading-charts', subGraph: {
+              candle: {
+                lineWidth: 1,
+                title: 'JINDALSTEL_NSE',
+                titleFontSize: '20px Arial',
+                titleFontColor: '#000',
+              },
+              volume: {
+                yScaleTitle: 'Volume'
+              }
+            }
+          }
         );
         // fetch data and set
         fetch("/data.json", {

@@ -6,7 +6,7 @@ import {
   YCoordinateMap,
   ZOOM_STEP, debug, error, getLineDash, log
 } from './types';
-import { clearCanvas, drawArea, drawBar, drawCandle, drawGridLine, drawLine, drawText } from './utils';
+import { clearCanvas, drawArea, drawBar, drawCandle, drawCenterPivotRotatedText, drawGridLine, drawLine, drawText } from './utils';
 
 declare global {
   interface String {
@@ -72,7 +72,7 @@ export class TradingChart {
    * @param settings Cosmetic settings for the chart
    */
   constructor(private _root: HTMLElement, public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
-    debug(`Instantiating trading chart.`, 'root', _root, 'config', config, 'settings', _settings);
+    // debug(`Instantiating trading chart.`, 'root', _root, 'config', config, 'settings', _settings);
 
     const scaleIds = Object.keys(config);
 
@@ -313,6 +313,21 @@ export class TradingChart {
     // Ask for redraw with whatever data
     this.redrawMainCanvas();
 
+    // watermark
+    if (this.settings.watermarkText) {
+      this.root.append('div').attr('class', 'watermark').attr('style', `
+        position: absolute;
+        width: ${this.settings.width}px;
+        height: ${this.settings.height}px;
+        text-align: center;
+        vertical-align: middle;
+        line-height: ${this.settings.height}px;
+        font-size: 3rem;
+        color: #00000012;
+        transform: rotate(-45deg);
+      `.trimLines()).html(this.settings.watermarkText);
+    }
+
     debug(this)
   }
 
@@ -366,21 +381,15 @@ export class TradingChart {
   public redrawMainCanvas() {
     // If there is data then only main graph will be drawn
     if (this.windowedData) {
-      debug('Chart Data', this.windowedData);
+      // debug('Chart Data', this.windowedData);
       const xScaleDomainSet = new Set<number>() // merged with all plots
-
       const xScaleCanvas = this.scaleXCanvas.node() as HTMLCanvasElement;
       const xScaleCanvasWidth = +this.scaleXCanvas.attr('width');
       const xScaleCanvasHeight = +this.scaleXCanvas.attr('height');
-
       const xScaleCanvasCtx = xScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
+      const xScaleFormat = d3.timeFormat(this.settings.xScaleFormat || '%e %b, %I:%M %p');
       // clear canvas
       clearCanvas(xScaleCanvasCtx, 0, 0, xScaleCanvasWidth, xScaleCanvasHeight);
-      // assumed text dim
-      xScaleCanvasCtx.font = this.settings.scaleFontSize;
-      xScaleCanvasCtx.textAlign = 'center';
-      const textMeasurement = xScaleCanvasCtx.measureText('77:77');
-      const xscaleY = xScaleCanvasHeight / 2;
 
       const callOnXTicks = (direction: 'forward' | 'backward', fn: (d: Date, i: number, _: Date[]) => void) => {
         const domain = this.d3xScale.domain();
@@ -533,28 +542,52 @@ export class TradingChart {
             return Math.abs(rv - d);
           }
           return rv;
-        }, 0)
-        const tickFormat = (yScaleDomainSize > 1000) ? d3yScale.tickFormat(yScaleTicksCount, '~s') :
-          (yScaleDomainSize < 10) ? d3yScale.tickFormat(yScaleTicksCount, '.2~f') : d3yScale.tickFormat(yScaleTicksCount, 'd');
+        }, 0);
 
-        ticks.map((tick, i, _) => {
+        const tickFormat = d3yScale.tickFormat(yScaleTicksCount, ((this.settings.subGraph || {})[scaleId] || {}).yScaleFormat ||
+          ((yScaleDomainSize > 1000) ? '~s' : (yScaleDomainSize < 10) ? '.2~f' : 'd'));
+
+        ticks.map((tick) => {
           const y = d3yScale(tick);
           drawText(yScaleCanvasCtx, tickFormat(tick), 1, y, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
         })
+        const yScaleTitle = ((this.settings.subGraph || {})[scaleId] || {}).yScaleTitle;
+        if (yScaleTitle)
+          drawCenterPivotRotatedText(yScaleCanvasCtx, yScaleTitle, yScaleCanvasWidth - parseInt(this.settings.scaleFontSize), yScaleCanvasHeight / 2, 270,
+            this.settings.scaleFontColor, this.settings.scaleFontSize);
         // -----------------------------------END: Draw y Scale------------------------------------------------
+
+        // -----------------------------------START: Draw title------------------------------------------------
+        const title = ((this.settings.subGraph || {})[scaleId] || {}).title;
+        if (title) {
+          const titleFontColor = ((this.settings.subGraph || {})[scaleId] || {}).titleFontColor || this.settings.scaleFontColor;
+          const titleFontSize = ((this.settings.subGraph || {})[scaleId] || {}).titleFontSize || this.settings.scaleFontSize;
+          const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legend || this.settings.legend || 'top-center';
+          const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
+          const legendMarginType = typeof (legendMargin);
+          switch (legendPosition) {
+            case 'top-center':
+              drawText(mainCanvasCtx, title, canvasWidth / 2, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'center', 'top');
+              break;
+
+            case 'top-right':
+              drawText(mainCanvasCtx, title, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2], legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'right', 'top');
+              break;
+
+            case 'top-left':
+              drawText(mainCanvasCtx, title, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'left', 'top');
+              break;
+          }
+        }
+        // -----------------------------------END: Draw title------------------------------------------------
 
       });
 
       // ----------------Draw X axis-----------------------
       callOnXTicks('forward', (d, i, _) => {
-        const hh = d.getHours(), mm = d.getMinutes();
-        let text = '';
-        if (i === 0 || (hh === this.defaults.marketStartTime[0] && mm === this.defaults.marketStartTime[1]))
-          text = `${d.getDate()}/${d.getMonth() + 1}`
-        else text = `${hh}:${`0${mm}`.slice(-2)}`;
+        const xscaleY = xScaleCanvasHeight / 2;
         const x = this.d3xScale(d) as number;
-        drawText(xScaleCanvasCtx, text, (i === _.length - 1) ? x - textMeasurement.width : x, xscaleY,
-          0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
+        drawText(xScaleCanvasCtx, xScaleFormat(d), x, xscaleY, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
       });
 
     }
