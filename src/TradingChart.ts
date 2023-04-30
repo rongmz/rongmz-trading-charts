@@ -1,12 +1,10 @@
 import * as d3 from 'd3';
 import {
-  CLASS_SUBGRAPH, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DEAFULT_ZOOM_LEVEL, DarkThemeChartSettings, GraphData, Interpolator,
-  LightThemeChartSettings, MIN_ZOOM_POINTS, MousePosition, PlotData, PlotLineType, PlotMatConfig, ScaleRowMap, SubGraphMatConfig, SubGraphSettings,
-  X_AXIS_HEIGHT_PX,
-  YCoordinateMap,
-  ZOOM_STEP, debug, error, getLineDash, log
+  CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DEAFULT_ZOOM_LEVEL, DarkThemeChartSettings,
+  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, PlotLineType, ScaleRowMap,
+  X_AXIS_HEIGHT_PX, YCoordinateMap, debug
 } from './types';
-import { clearCanvas, drawArea, drawBar, drawCandle, drawCenterPivotRotatedText, drawGridLine, drawLine, drawText } from './utils';
+import { clearCanvas, drawArea, drawBar, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
 
 declare global {
   interface String {
@@ -25,18 +23,10 @@ Number.prototype.toDevicePixel = function (this: number) {
 
 export class TradingChart {
 
-  /** All defaults */
-  public defaults = {
-    colorPallet: d3.schemePaired,
-    yScalePaddingPct: 0.1,
-    xScalePadding: 0.2,
-    marketStartTime: [9, 15],
-    zoomLevel: DEAFULT_ZOOM_LEVEL,
-  }
+  private dataMat: GraphDataMat = [];
+  private dataWindowStartIndex?: number;
+  private dataWindowEndIndex?: number;
 
-
-  private data?: GraphData;
-  private windowedData?: GraphData
   private settings: ChartSettings;
   /** Chart root element provided as container */
   private root;
@@ -54,15 +44,14 @@ export class TradingChart {
   private scaleXCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
   private scaleXUpdateCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
 
-  private zoomLevel: number = this.defaults.zoomLevel;
   private zoomInterpolator: Interpolator<number, number> = d3.interpolateNumber(0, 0);
   private panOffset: number = 0;
 
-  private currentMousePosition: MousePosition = { x: 0, y: 0 }
-  private canvasYCoordinateMap: YCoordinateMap<d3.Selection<HTMLCanvasElement, any, any, any>> = {}
-
   private d3xScale = d3.scaleBand<Date>();
   private d3yScaleMap: D3YScaleMap = {};
+
+  private currentMouseDownStart?: MouseDownPosition;
+
 
 
   /**
@@ -298,17 +287,35 @@ export class TradingChart {
     `.trimLines());
 
     // setup listeners for mouse.
-    // scaleIds.map(scaleId => {
-    // const d3Canvas = this.mainUpdateCanvasMap[scaleId];
-    this.table.on('mousemove', (event: MouseEvent) => {
-      // debug('mousemove', event.x, event.y, event.currentTarget);
-      this.currentMousePosition.x = event.x;
-      this.currentMousePosition.y = event.y;
-      // this.currentMousePosition.canvas = (event.currentTarget as any)?.getContext ? (event.currentTarget as any) : undefined;
-      this.redrawUpdateCanvas();
-      // this.redrawUpdateCanvas();
+    scaleIds.map(scaleId => {
+      const d3Canvas = this.mainUpdateCanvasMap[scaleId];
+      d3Canvas.on('mousedown', event => {
+        event.preventDefault();
+        this.currentMouseDownStart = { scaleId, x: event.x, y: event.y };
+      })
+      d3Canvas.on('mouseup', event => {
+        event.preventDefault();
+        this.currentMouseDownStart = undefined;
+      });
+      d3Canvas.on('mousemove', event => {
+        event.preventDefault();
+        if (this.currentMouseDownStart) {
+          this.currentMouseDownStart.dx = event.x - this.currentMouseDownStart.x;
+          this.currentMouseDownStart.dy = event.y - this.currentMouseDownStart.y;
+          this.pan(this.currentMouseDownStart.dx || 0, this.currentMouseDownStart.dy || 0)
+        }
+        else {
+          // just normal mouse move update pointer crosshead
+          // debug('normal mouse move', scaleId, event.x, event.y)
+        }
+      });
     });
-    // })
+    // attach zoom to table
+    this.table.on('wheel', (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.deltaY < 0) this.zoom(this.settings.wheelZoomSensitivity);
+      else this.zoom(-this.settings.wheelZoomSensitivity);
+    })
 
     // Ask for redraw with whatever data
     this.redrawMainCanvas();
@@ -323,9 +330,9 @@ export class TradingChart {
         vertical-align: middle;
         line-height: ${this.settings.height}px;
         font-size: 3rem;
+        overflow: hidden;
         color: #00000012;
-        transform: rotate(-45deg);
-      `.trimLines()).html(this.settings.watermarkText);
+      `.trimLines()).append('span').attr('style', 'white-space:break-spaces').html(this.settings.watermarkText);
     }
 
     debug(this)
@@ -337,42 +344,123 @@ export class TradingChart {
    * @param data
    */
   public setData(_data: GraphData) {
-    this.data = _data;
-    const l = Object.keys(_data).reduce((l, id) => Math.max(l, _data[id].length), 0);
-    this.zoomInterpolator = d3.interpolateNumber(l, MIN_ZOOM_POINTS)
-    this._extractZoomWindowFromData(_data);
+    // extract grouped data
+    const dtgrouped = Object.keys(this.config).reduce((rv, scaleId) => {
+      const subgraph = this.config[scaleId];
+      Object.keys(subgraph).map((plotName, i) => {
+        const plotConf = subgraph[plotName];
+        const d = _data[plotConf.dataId] || [];
+        const colorpallet = ((this.settings.subGraph || {})[scaleId] || {}).colorPallet || this.settings.colorPallet || d3.schemePaired;
+        const defaultColor = colorpallet[i % colorpallet.length];
+        // loop thourgh d
+        d.map(d => {
+          const ts = plotConf.tsValue(d);
+          const data = plotConf.data(d);
+          const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
+
+          if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color } } };
+          else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color } };
+          else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color };
+        })
+      });
+      return rv;
+    }, {} as any);
+    // save data mat
+    const xDomainValus = Object.keys(dtgrouped).sort((a, b) => ((+a) - (+b)));
+    this.dataMat = xDomainValus.map(tsk => {
+      return { ts: new Date(+tsk), data: dtgrouped[tsk] }
+    });
+
+    this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
+    this.updateWindowFromZoomPan();
     // draw main graph
     this.redrawMainCanvas();
   }
 
-  /** The function extracts data from zoom level. */
-  private _extractZoomWindowFromData(d?: GraphData) {
-    const _data = d || this.data || {};
-    this.windowedData = Object.keys(_data).reduce((rv, dataId) => {
-      const d = _data[dataId];
-      const windowLength = this.zoomInterpolator(this.zoomLevel);
-      // x2=L-1-panoffset
-      // x1=L-1-panoffset - (b-1)
-      rv[dataId] = (d as any[]).filter((_, i) => (
-        i > (d.length - 1 - this.panOffset - windowLength) &&
-        i < (d.length - this.panOffset)
-      ))
-      return rv;
-    }, {} as GraphData);
+  /**
+   * Funtion to get the windowes data based on zoom. Do not slice the actual data.
+   */
+  public getWindowedData(): GraphDataMat {
+    return this.dataMat.slice(this.dataWindowStartIndex || 0, this.dataWindowEndIndex || this.dataMat.length);
+  }
+
+  /**
+   * Update window from zoom and pan
+   */
+  private updateWindowFromZoomPan() {
+    const windowLength = this.zoomInterpolator(this.settings.zoomLevel);
+    // x2=L-1-panoffset
+    // x1=L-1-panoffset - (b-1)
+    this.dataWindowStartIndex = Math.max(0, this.dataMat.length - 1 - this.panOffset - windowLength);
+    this.dataWindowEndIndex = Math.min(this.dataMat.length, this.dataMat.length - this.panOffset);
   }
 
   /** Do zoom */
-  public zoom(e: WheelEvent) {
-    e.preventDefault();
-    if (e.deltaY < 0) this.zoomLevel = Math.max(this.zoomLevel - ZOOM_STEP, 0);
-    else this.zoomLevel = Math.min(this.zoomLevel + ZOOM_STEP, 1);
+  public zoom(step: number) {
+    this.settings.zoomLevel = Math.max(Math.min(this.settings.zoomLevel + step, 1), 0);
 
-    this._extractZoomWindowFromData();
-    debug('zoom', this.zoomLevel);
+    this.updateWindowFromZoomPan();
     this.redrawMainCanvas();
   }
 
+  /**
+   * Panning. positive dx for pan to see latest data at right hand side.
+   * @param dx
+   * @param dy
+   */
+  public pan(dx: number, dy: number) {
+    const xBandW = this.d3xScale.step();
+    const maxBarsToscroll = Math.floor(dx / xBandW);
+    this.panOffset = maxBarsToscroll;
 
+    this.updateWindowFromZoomPan();
+    this.redrawMainCanvas();
+  }
+
+  /**
+   * Dynamically update chart settings.
+   * @param _settings
+   */
+  public updateSettings(_settings: Partial<ChartSettings>) {
+    this.settings = Object.assign(this.settings || {}, _settings) as ChartSettings;
+    // ask for redraw
+    this.updateWindowFromZoomPan();
+    this.redrawMainCanvas();
+  }
+
+  /**
+   * Update all scale domains
+   * @param windowedData
+   */
+  private updateDomains(windowedData: GraphDataMat) {
+    // update x scale domain
+    this.d3xScale.domain(windowedData.map(_ => _.ts));
+    // update y scale domains
+    const maxminMap = windowedData.reduce((rv, d) => {
+      const scaleIds = Object.keys(d.data);
+      scaleIds.map(scaleId => {
+        let max = -Infinity, min = Infinity;
+        Object.keys(d.data[scaleId]).map(plotName => {
+          const plotd = d.data[scaleId][plotName];
+          max = Math.max(max, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d);
+          min = Math.min(min, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d);
+        });
+        if (!rv[scaleId]) rv[scaleId] = { max, min };
+        else {
+          rv[scaleId].max = Math.max(rv[scaleId].max, max);
+          rv[scaleId].min = Math.min(rv[scaleId].min, min);
+        }
+      });
+      return rv;
+    }, {} as any);
+    Object.keys(maxminMap).map(scaleId => {
+      const { max, min } = maxminMap[scaleId];
+      const yScaleDomainPaddingLength = (max - min) * (((this.settings.subGraph || {})[scaleId] || {}).yScalePaddingPct || this.settings.yScalePaddingPct);
+      if (!this.d3yScaleMap[scaleId]) this.d3yScaleMap[scaleId] = d3.scaleLinear();
+      this.d3yScaleMap[scaleId]
+        .domain([min - yScaleDomainPaddingLength, max + yScaleDomainPaddingLength])
+    })
+  }
 
   /**
    * Function which redraws the main canvas and corresponding scales
@@ -380,14 +468,18 @@ export class TradingChart {
    */
   public redrawMainCanvas() {
     // If there is data then only main graph will be drawn
-    if (this.windowedData) {
-      // debug('Chart Data', this.windowedData);
-      const xScaleDomainSet = new Set<number>() // merged with all plots
+    if (this.dataMat && this.dataMat.length) {
+      const windowedData = this.getWindowedData();
+      // update scale domains
+      this.updateDomains(windowedData);
+
       const xScaleCanvas = this.scaleXCanvas.node() as HTMLCanvasElement;
       const xScaleCanvasWidth = +this.scaleXCanvas.attr('width');
       const xScaleCanvasHeight = +this.scaleXCanvas.attr('height');
-      const xScaleCanvasCtx = xScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
       const xScaleFormat = d3.timeFormat(this.settings.xScaleFormat || '%e %b, %I:%M %p');
+
+      const xScaleCanvasCtx = xScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
+
       // clear canvas
       clearCanvas(xScaleCanvasCtx, 0, 0, xScaleCanvasWidth, xScaleCanvasHeight);
 
@@ -410,44 +502,13 @@ export class TradingChart {
         const yScaleCanvasWidth = +this.scaleYCanvasMap[scaleId].attr('width');
         const yScaleCanvasHeight = +this.scaleYCanvasMap[scaleId].attr('height');
 
-        // now plot with every configured plot
-        const yScaleDomain: number[] = []; // <-- y scale domain
-
-        const matSubGraphConfig = Object.keys(subgraphConfig).reduce((rv, plotName, i) => {
-          const { type, dataId, tsValue, data, color, baseY } = subgraphConfig[plotName];
-          const d = (this.windowedData as GraphData)[dataId];
-          if (d) {
-            // only if data is present with the given dataId.
-            const tsValueMat: Date[] = [], dataMat: PlotData[] = [], colorMat: string[] = []
-            d.map(_ => {
-              tsValueMat.push(tsValue(_));
-              dataMat.push(data(_));
-              if (color) colorMat.push(typeof (color) === 'function' ? color(_) : color)
-              else colorMat.push(this.defaults.colorPallet[i % this.defaults.colorPallet.length])
-            });
-            rv[plotName] = { type, dataId, tsValue: tsValueMat, data: dataMat, color: colorMat, baseY };
-            // calculate domains as well
-            yScaleDomain[0] = d3.min(dataMat, d => (typeof (d) === 'object' ? d.l : d)) as number;
-            yScaleDomain[1] = d3.max(dataMat, d => (typeof (d) === 'object' ? d.h : d)) as number;
-            // x scale domain and merge all
-            tsValueMat.map(_ => xScaleDomainSet.add(_.getTime()))
-          }
-          return rv;
-        }, {} as SubGraphMatConfig);
-
         // draw scales
-        const yScaleDomainPaddingLength = (yScaleDomain[1] - yScaleDomain[0]) * this.defaults.yScalePaddingPct;
-        if (!this.d3yScaleMap[scaleId]) this.d3yScaleMap[scaleId] = d3.scaleLinear();
-        this.d3yScaleMap[scaleId]
-          .domain([yScaleDomain[0] - yScaleDomainPaddingLength, yScaleDomain[1] + yScaleDomainPaddingLength])
-          .range([canvasHeight, 0]);
+        this.d3yScaleMap[scaleId].range([canvasHeight, 0]);
         const d3yScale = this.d3yScaleMap[scaleId];
 
-        const xScaleDomain = Array.from(xScaleDomainSet).map(_ => new Date(_)).sort((a, b) => (a.getTime() - b.getTime())); // <-- x scale domain
         this.d3xScale
-          .domain(xScaleDomain)
           .range([0, xScaleCanvasWidth])
-          .padding(this.defaults.xScalePadding);
+          .padding(this.settings.xScalePadding);
 
         const mainCanvasCtx = canvas.getContext('2d') as CanvasRenderingContext2D;
         const yScaleCanvasCtx = yScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
@@ -460,17 +521,19 @@ export class TradingChart {
         // -----------------------------------END: Draw Axis------------------------------------------------
 
         // -----------------------------------START: Draw Plot------------------------------------------------
-        Object.keys(matSubGraphConfig).map(plotName => {
-          const plotConfig = matSubGraphConfig[plotName];
+        Object.keys(subgraphConfig).map(plotName => {
+          const plotConfig = subgraphConfig[plotName];
           const subGraphSettings = (this.settings.subGraph || {})[scaleId] || {};
           const bandW = this.d3xScale.bandwidth();
           switch (plotConfig.type) {
 
             //--------------Candle plot------------
             case 'candle':
-              (plotConfig.data as CandlePlotData[]).map((d, i) => {
-                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
-                drawCandle(mainCanvasCtx, plotConfig.color[i], x, d3yScale(d.o), d3yScale(d.c), x + bandW / 2, d3yScale(d.h), d3yScale(d.l), bandW)
+              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                const _d = d.data[scaleId][plotName];
+                const _c = _d.d as CandlePlotData;
+                const x = this.d3xScale(d.ts) as number;
+                drawCandle(mainCanvasCtx, _d.color, x, d3yScale(_c.o), d3yScale(_c.c), x + bandW / 2, d3yScale(_c.h), d3yScale(_c.l), bandW)
               });
               break;
 
@@ -478,43 +541,46 @@ export class TradingChart {
             case 'dashed-line':
             case 'dotted-line':
             case 'solid-line':
-              drawLine(mainCanvasCtx, plotConfig.color[0], plotConfig.type as PlotLineType,
-                (subGraphSettings.lineWidth || this.settings.lineWidth), (plotConfig.data as number[]).map((d, i) => {
-                  const x = this.d3xScale(plotConfig.tsValue[i]) as number;
-                  const y = d3yScale(d);
+              drawLine(mainCanvasCtx, windowedData[windowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
+                (subGraphSettings.lineWidth || this.settings.lineWidth), windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                  const _d = d.data[scaleId][plotName];
+                  const x = this.d3xScale(d.ts) as number;
+                  const y = d3yScale(_d.d as number);
                   return [x + bandW / 2, y];
                 }));
               break;
 
             //--------------bar plot------------
             case 'bar':
-              (plotConfig.data as number[]).map((d, i) => {
-                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
-                const y = d3yScale(d);
-                drawBar(mainCanvasCtx, plotConfig.color[i], x, y, bandW, canvasHeight - y);
+              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                const _d = d.data[scaleId][plotName];
+                const x = this.d3xScale(d.ts) as number;
+                const y = d3yScale(_d.d as number);
+                drawBar(mainCanvasCtx, _d.color, x, y, bandW, canvasHeight - y);
               });
               break;
 
             //--------------var bar plot------------
             case 'var-bar':
               const baseY = typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight;
-              (plotConfig.data as number[]).map((d, i) => {
-                const x = this.d3xScale(plotConfig.tsValue[i]) as number;
-                const y = d3yScale(d);
-                drawBar(mainCanvasCtx, plotConfig.color[i], x, y, bandW, baseY - y);
+              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                const _d = d.data[scaleId][plotName];
+                const x = this.d3xScale(d.ts) as number;
+                const y = d3yScale(_d.d as number);
+                drawBar(mainCanvasCtx, _d.color, x, y, bandW, baseY - y);
               });
               break;
 
             //--------------area plot------------
             case 'area':
-              const color = d3.color(plotConfig.color[0]) as d3.RGBColor | d3.HSLColor;
-              // debug(typeof(plotConfig.baseY)!=='undefined' ? d3yScale(plotConfig.baseY) : d3yScale.invert(canvasHeight))
+              const color = d3.color(windowedData[windowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
               drawArea(mainCanvasCtx, color.formatHex8(), (subGraphSettings.lineWidth || this.settings.lineWidth),
                 [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()],
                 typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight,
-                (plotConfig.data as number[]).map((d, i) => {
-                  const x = this.d3xScale(plotConfig.tsValue[i]) as number;
-                  const y = d3yScale(d);
+                windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                  const _d = d.data[scaleId][plotName];
+                  const x = this.d3xScale(d.ts) as number;
+                  const y = d3yScale(_d.d as number);
                   return [x + bandW / 2, y];
                 }));
               break;
@@ -551,7 +617,7 @@ export class TradingChart {
           const y = d3yScale(tick);
           drawText(yScaleCanvasCtx, tickFormat(tick), 1, y, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
         })
-        const yScaleTitle = ((this.settings.subGraph || {})[scaleId] || {}).yScaleTitle;
+        const yScaleTitle = ((this.settings.subGraph || {})[scaleId] || {}).yScaleTitle || this.settings.yScaleTitle;
         if (yScaleTitle)
           drawCenterPivotRotatedText(yScaleCanvasCtx, yScaleTitle, yScaleCanvasWidth - parseInt(this.settings.scaleFontSize), yScaleCanvasHeight / 2, 270,
             this.settings.scaleFontColor, this.settings.scaleFontSize);
@@ -596,28 +662,7 @@ export class TradingChart {
 
   /** Function responsible for redrawing update canvas for mouse positions and annotations on scales. */
   public redrawUpdateCanvas() {
-    if (this.currentMousePosition.canvas) {
-      const d3canvas = d3.select(this.currentMousePosition.canvas);
-      const canvasType = d3canvas.attr('canvasType');
-      const scaleId = d3canvas.attr('scaleId');
-      const width = parseInt(d3canvas.attr('width') || '0');
-      const height = parseInt(d3canvas.attr('height') || '0');
-      debug('redrawUpdateCanvas', canvasType, scaleId);
-      const ctx = this.currentMousePosition.canvas.getContext('2d');
-      if (ctx !== null) {
-        // clear all
-        ctx.clearRect(0, 0, width.toDevicePixel(), height.toDevicePixel());
 
-        // x line
-        ctx.beginPath();
-        ctx.lineWidth = this.settings.crossHairWidth;
-        ctx.strokeStyle = this.settings.crossHairColor;
-        ctx.setLineDash(getLineDash(this.settings.crossHairType));
-        ctx.moveTo(0, this.currentMousePosition.y.toDevicePixel());
-        ctx.lineTo(width.toDevicePixel(), this.currentMousePosition.y.toDevicePixel());
-        ctx.stroke();
-      }
-    }
   }
 
 

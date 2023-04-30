@@ -6,7 +6,6 @@ export type PlotData = CandlePlotData | number
 
 export const CLASS_SUBGRAPH = 'rongmz_subgraph'
 
-export const ZOOM_STEP = 0.01;
 export const DEAFULT_ZOOM_LEVEL = 0.8;
 export const MIN_ZOOM_POINTS = 3;
 export const X_AXIS_HEIGHT_PX = 25;
@@ -30,44 +29,40 @@ export type PlotLineType = 'solid-line' | 'dashed-line' | 'dotted-line'
 /** Data based config for each plot */
 export interface PlotConfig {
   /** Plot type */
-  type: PlotLineType | 'area' | 'candle' | 'bar',
-  /** The dataId in data */
-  dataId: string,
-  /** timestamp extactor in data timestamp will be in string */
-  tsValue: (data: TsOLHCVCandle | TsValue) => Date,
-  /** data extractor */
-  data: (data: TsOLHCVCandle | TsValue) => PlotData,
-  /** Only for area plot, the base Y value of the plot */
-  baseY?: number,
-  /** Dynamic coloring based on each value or overall coloring */
-  color?: string | ((data: TsOLHCVCandle | TsValue) => string),
-}
-
-export interface SubGraphMatConfig {
-  [plotName: string]: PlotMatConfig
-}
-
-export interface PlotMatConfig {
-  /** Plot type */
   type: PlotLineType | 'area' | 'candle' | 'bar' | 'var-bar',
   /** The dataId in data */
   dataId: string,
-  /** timestamp extactor in data */
-  tsValue: Date[],
+  /** timestamp extactor in data timestamp will be in string */
+  tsValue: (data: TsOLHCVCandle | TsValue | any) => Date,
   /** data extractor */
-  data: PlotData[],
+  data: (data: TsOLHCVCandle | TsValue | any) => PlotData,
   /** Only for area plot, the base Y value of the plot */
   baseY?: number,
   /** Dynamic coloring based on each value or overall coloring */
-  color: string[],
+  color?: string | ((data: TsOLHCVCandle | TsValue | any) => string),
 }
+
 
 /**
  * Data is provided with data id
  */
 export interface GraphData {
-  [dataId: string]: TsOLHCVCandle[] | TsValue[]
+  [dataId: string]: (TsOLHCVCandle | TsValue | any)[]
 }
+
+export interface DataMat {
+  ts: Date,
+  data: {
+    [scaleId: string]: {
+      [plotName: string]: {
+        d: PlotData,
+        color: string
+      }
+    }
+  }
+}
+
+export type GraphDataMat = DataMat[]
 
 
 /** cosmetic settings for a sub graph */
@@ -84,6 +79,8 @@ export interface SubGraphSettings {
   yScaleTickCount: number,
   /** the d3 format specifier for y scale. */
   yScaleFormat: string,
+  /** Y scale padding pct */
+  yScalePaddingPct: number,
   /** legend placement */
   legend: 'top-left' | 'top-center' | 'top-right',
   /** legend font size */
@@ -96,6 +93,8 @@ export interface SubGraphSettings {
   scaleSectionRatio: number,
   /** The delta height changed due to section resizing */
   deltaHeight: number,
+  /** The color theme for graph if no color specified */
+  colorPallet: string[],
 }
 
 /** Cosmetic settings for the entire Chart */
@@ -124,6 +123,8 @@ export interface ChartSettings extends SubGraphSettings {
   xGridInterval: number,
   /** xscale format */
   xScaleFormat: string,
+  /** padding for x scale after bandwidth */
+  xScalePadding: number,
   /** Color of scale lines */
   scaleLineColor: string,
   /** color for the scale ticks */
@@ -132,6 +133,10 @@ export interface ChartSettings extends SubGraphSettings {
   scaleFontSize: string,
   /** watermark text default: `""` */
   watermarkText: string,
+  /** The zoom level for the graph in the range of [0-1] */
+  zoomLevel: number,
+  /** The sensitivity of mouse wheel zoom (< 1) detailed and slow zooming keep value very very low. */
+  wheelZoomSensitivity: number,
   /** Individual settings for each scale sections */
   subGraph: {
     [scaleId: string]: SubGraphSettings
@@ -159,6 +164,10 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
   legendMargin: 10,
+  yScalePaddingPct: 0.1,
+  xScalePadding: 0.2,
+  zoomLevel: DEAFULT_ZOOM_LEVEL,
+  wheelZoomSensitivity: 0.01,
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -183,6 +192,10 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
   legendMargin: 10,
+  yScalePaddingPct: 0.1,
+  xScalePadding: 0.2,
+  zoomLevel: DEAFULT_ZOOM_LEVEL,
+  wheelZoomSensitivity: 0.01,
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -201,10 +214,12 @@ export interface ScaleRowMap {
   [scaleId: string]: d3.Selection<HTMLTableCellElement, any, any, any>[]
 }
 
-export interface MousePosition {
+export interface MouseDownPosition {
   x: number,
   y: number,
-  canvas?: HTMLCanvasElement
+  dx?: number,
+  dy?: number,
+  scaleId: string
 }
 
 export const getLineDash = (type: 'solid' | 'dashed' | 'dotted') => {
