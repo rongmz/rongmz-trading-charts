@@ -46,6 +46,7 @@ export class TradingChart {
 
   private zoomInterpolator: Interpolator<number, number> = d3.interpolateNumber(0, 0);
   private panOffset: number = 0;
+  private panOffsetSaved: number = 0;
 
   private d3xScale = d3.scaleBand<Date>();
   private d3yScaleMap: D3YScaleMap = {};
@@ -296,6 +297,7 @@ export class TradingChart {
       d3Canvas.on('mouseup', event => {
         event.preventDefault();
         this.currentMouseDownStart = undefined;
+        this.panOffsetSaved = this.panOffset;
       });
       d3Canvas.on('mousemove', event => {
         event.preventDefault();
@@ -397,7 +399,7 @@ export class TradingChart {
 
   /** Do zoom */
   public zoom(step: number) {
-    this.settings.zoomLevel = Math.max(Math.min(this.settings.zoomLevel + step, 1), 0);
+    this.settings.zoomLevel = Math.max(Math.min(this.settings.zoomLevel + step, 1), 0.001);
 
     this.updateWindowFromZoomPan();
     this.redrawMainCanvas();
@@ -411,8 +413,8 @@ export class TradingChart {
   public pan(dx: number, dy: number) {
     const xBandW = this.d3xScale.step();
     const maxBarsToscroll = Math.floor(dx / xBandW);
-    this.panOffset = maxBarsToscroll;
-
+    const windowLength = this.zoomInterpolator(this.settings.zoomLevel);
+    this.panOffset = Math.min(Math.max(0, this.panOffsetSaved + maxBarsToscroll), this.panOffset + windowLength);
     this.updateWindowFromZoomPan();
     this.redrawMainCanvas();
   }
@@ -476,7 +478,7 @@ export class TradingChart {
       const xScaleCanvas = this.scaleXCanvas.node() as HTMLCanvasElement;
       const xScaleCanvasWidth = +this.scaleXCanvas.attr('width');
       const xScaleCanvasHeight = +this.scaleXCanvas.attr('height');
-      const xScaleFormat = d3.timeFormat(this.settings.xScaleFormat || '%e %b, %I:%M %p');
+      const xScaleFormat = d3.timeFormat(this.settings.xScaleFormat);
 
       const xScaleCanvasCtx = xScaleCanvas.getContext('2d') as CanvasRenderingContext2D;
 
@@ -485,9 +487,12 @@ export class TradingChart {
 
       const callOnXTicks = (direction: 'forward' | 'backward', fn: (d: Date, i: number, _: Date[]) => void) => {
         const domain = this.d3xScale.domain();
-        for (let i = 0; i < domain.length; i++) {
-          const j = (direction === 'backward') ? domain.length - 1 - i : i;
-          if (i % this.settings.xGridInterval === 0) fn(domain[j], i, domain);
+        const totalDomainLength = domain.length;
+        const stepsize = Math.floor(totalDomainLength / this.settings.xGridInterval);
+        for (let i = 0; i < this.settings.xGridInterval; i++) {
+          const index = i * stepsize;
+          const j = (direction === 'backward') ? totalDomainLength - 1 - index : index;
+          fn(domain[j], i, domain);
         }
       }
 

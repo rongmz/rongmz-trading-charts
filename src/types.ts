@@ -152,7 +152,7 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   background: '#FFFFFFFF',
   gridLinesType: 'both',
   gridLinesColor: '#00000010',
-  xGridInterval: 15,
+  xGridInterval: 7,
   scaleLineColor: '#00000030',
   scaleFontColor: '#000000',
   scaleFontSize: '12px Arial',
@@ -168,6 +168,7 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   xScalePadding: 0.2,
   zoomLevel: DEAFULT_ZOOM_LEVEL,
   wheelZoomSensitivity: 0.01,
+  xScaleFormat: '%d/%m, %H:%M',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -180,7 +181,7 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   background: '#000000FF',
   gridLinesType: 'both',
   gridLinesColor: '#FFFFFF10',
-  xGridInterval: 15,
+  xGridInterval: 7,
   scaleLineColor: '#FFFFFF30',
   scaleFontColor: '#FFFFFF',
   scaleFontSize: '12px Arial',
@@ -196,6 +197,7 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   xScalePadding: 0.2,
   zoomLevel: DEAFULT_ZOOM_LEVEL,
   wheelZoomSensitivity: 0.01,
+  xScaleFormat: '%d/%m, %H:%M',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
