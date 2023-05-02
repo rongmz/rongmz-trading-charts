@@ -79,6 +79,8 @@ export interface SubGraphSettings {
   yScaleTickCount: number,
   /** the d3 format specifier for y scale. */
   yScaleFormat: string,
+  /** The format to use for crosshair pointer position value */
+  crossHairYScaleFormat: string,
   /** Y scale padding pct */
   yScalePaddingPct: number,
   /** legend placement */
@@ -107,12 +109,12 @@ export interface ChartSettings extends SubGraphSettings {
   plotSectionRatio: number,
   /** Color of the graph separator */
   graphSeparatorColor: string
-  /** Cross hair line type */
-  crossHairType: 'solid' | 'dashed' | 'dotted',
   /** Cross hair line width */
   crossHairWidth: number,
   /** Cross hair line color */
   crossHairColor: string,
+  /** Contrast color for crosshair, mainly will be used for text */
+  crossHairContrastColor: string,
   /** Background color */
   background: string,
   /** Grid lines to display */
@@ -123,6 +125,8 @@ export interface ChartSettings extends SubGraphSettings {
   xGridInterval: number,
   /** xscale format */
   xScaleFormat: string,
+  /** the time format for the xscale for the crosshair position */
+  xScaleCrossHairFormat: string,
   /** padding for x scale after bandwidth */
   xScalePadding: number,
   /** Color of scale lines */
@@ -146,9 +150,9 @@ export interface ChartSettings extends SubGraphSettings {
 /** Light theme graph settings */
 export const LightThemeChartSettings: Partial<ChartSettings> = {
   graphSeparatorColor: '#00000054',
-  crossHairType: 'dotted',
   crossHairWidth: 1,
   crossHairColor: '#3d3d3d',
+  crossHairContrastColor: '#ffffff',
   background: '#FFFFFFFF',
   gridLinesType: 'both',
   gridLinesColor: '#00000010',
@@ -169,15 +173,17 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   zoomLevel: DEAFULT_ZOOM_LEVEL,
   wheelZoomSensitivity: 0.01,
   xScaleFormat: '%d/%m, %H:%M',
+  xScaleCrossHairFormat: '%d/%m, %H:%M',
+  crossHairYScaleFormat: '.2f',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
 /** Dark theme graph settings */
 export const DarkThemeChartSettings: Partial<ChartSettings> = {
   graphSeparatorColor: '#FFFFFF54',
-  crossHairType: 'dotted',
   crossHairWidth: 1,
   crossHairColor: '#E8E8E8',
+  crossHairContrastColor: '#000000',
   background: '#000000FF',
   gridLinesType: 'both',
   gridLinesColor: '#FFFFFF10',
@@ -198,6 +204,8 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   zoomLevel: DEAFULT_ZOOM_LEVEL,
   wheelZoomSensitivity: 0.01,
   xScaleFormat: '%d/%m, %H:%M',
+  xScaleCrossHairFormat: '%d/%m, %H:%M',
+  crossHairYScaleFormat: '.2f',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -221,6 +229,12 @@ export interface MouseDownPosition {
   y: number,
   dx?: number,
   dy?: number,
+  scaleId: string
+}
+
+export interface MousePosition {
+  x: number,
+  y: number,
   scaleId: string
 }
 

@@ -1,10 +1,10 @@
 import * as d3 from 'd3';
 import {
-  CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DEAFULT_ZOOM_LEVEL, DarkThemeChartSettings,
-  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, YCoordinateMap, debug
+  CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings,
+  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotLineType, ScaleRowMap,
+  X_AXIS_HEIGHT_PX, debug
 } from './types';
-import { clearCanvas, drawArea, drawBar, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
+import { clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
 
 declare global {
   interface String {
@@ -52,6 +52,7 @@ export class TradingChart {
   private d3yScaleMap: D3YScaleMap = {};
 
   private currentMouseDownStart?: MouseDownPosition;
+  private mousePosition?: MousePosition;
 
 
 
@@ -299,8 +300,9 @@ export class TradingChart {
         this.currentMouseDownStart = undefined;
         this.panOffsetSaved = this.panOffset;
       });
-      d3Canvas.on('mousemove', event => {
+      d3Canvas.on('mousemove', (event: MouseEvent) => {
         event.preventDefault();
+        this.clearUpdateCanvas(); // clear the update canvas
         if (this.currentMouseDownStart) {
           this.currentMouseDownStart.dx = event.x - this.currentMouseDownStart.x;
           this.currentMouseDownStart.dy = event.y - this.currentMouseDownStart.y;
@@ -308,9 +310,22 @@ export class TradingChart {
         }
         else {
           // just normal mouse move update pointer crosshead
-          // debug('normal mouse move', scaleId, event.x, event.y)
+          const canvas = this.mainUpdateCanvasMap[scaleId].node();
+          const rect = canvas?.getBoundingClientRect();
+          const x = rect ? event.x - rect.left : event.x;
+          const y = rect ? event.y - rect.top : event.y;
+          if (!this.mousePosition) this.mousePosition = { x, y, scaleId };
+          else {
+            this.mousePosition.x = x;
+            this.mousePosition.y = y;
+            this.mousePosition.scaleId = scaleId;
+          }
+          this.redrawUpdateCanvas();
         }
       });
+      d3Canvas.on('mouseout', () => {
+        this.clearUpdateCanvas();
+      })
     });
     // attach zoom to table
     this.table.on('wheel', (event: WheelEvent) => {
@@ -468,7 +483,7 @@ export class TradingChart {
    * Function which redraws the main canvas and corresponding scales
    * Main canvas will be redrawn for zoom, panning, section resize etc.
    */
-  public redrawMainCanvas() {
+  private redrawMainCanvas() {
     // If there is data then only main graph will be drawn
     if (this.dataMat && this.dataMat.length) {
       const windowedData = this.getWindowedData();
@@ -666,8 +681,75 @@ export class TradingChart {
 
 
   /** Function responsible for redrawing update canvas for mouse positions and annotations on scales. */
-  public redrawUpdateCanvas() {
+  private redrawUpdateCanvas() {
+    // debug('redraw update canvas', this.mousePosition)
+    // calculate
+    const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
+    const xScaleWidth = +this.scaleXUpdateCanvas.attr('width');
+    const xScaleHeight = +this.scaleXUpdateCanvas.attr('height');
+    const xstep = this.d3xScale.step();
+    const bandW = this.d3xScale.bandwidth();
+    const domainVal = this.d3xScale.domain()[Math.floor((this.mousePosition?.x || 0).toDevicePixel() / xstep)]
+    const x = (this.d3xScale(domainVal) || 0) + bandW / 2;
+    if (xScaleCtx) {
+      const text = `  ${d3.timeFormat(this.settings.xScaleCrossHairFormat)(domainVal)}  `;
+      drawBoxFilledText(xScaleCtx, text, this.settings.crossHairColor, this.settings.crossHairContrastColor, x, 5, undefined, 0, undefined,
+        parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'center', 'top');
+      // drawText(xScaleCtx, text, x, 0, undefined, this.settings.crossHairContrastColor, this.settings.scaleFontSize, 'center', 'top')
+    }
 
+    Object.keys(this.config).map(scaleId => {
+      const canvas = this.mainUpdateCanvasMap[scaleId];
+      const ctx = canvas.node()?.getContext('2d');
+      const canvasWidth = +canvas.attr('width');
+      const canvasHeight = +canvas.attr('height');
+
+      if (ctx) {
+        drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
+
+        if (this.mousePosition?.scaleId === scaleId) {
+          const y = (this.mousePosition?.y || 0).toDevicePixel();
+          const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
+          const yformatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).crossHairYScaleFormat || this.settings.crossHairYScaleFormat)
+          const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
+          const yscalectx = yscalecanvas.node()?.getContext('2d');
+          const yscalecanvasWidth = +yscalecanvas.attr('width');
+
+          // draw y line
+          drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
+
+          if (yscalectx) {
+            // y scale drawing
+            drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
+              0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, yscalecanvasWidth.toDevicePixel(), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
+          }
+        }
+      }
+    })
+  }
+
+  /**
+   * This is to clear the update canvas
+   */
+  private clearUpdateCanvas() {
+    const scaleIds = Object.keys(this.config);
+    scaleIds.map(scaleId => {
+      const canvas = this.mainUpdateCanvasMap[scaleId];
+      const canvasCtx = canvas.node()?.getContext('2d');
+      const canvasWidth = +canvas.attr('width');
+      const canvasHeight = +canvas.attr('height');
+      if (canvasCtx) clearCanvas(canvasCtx, 0, 0, canvasWidth, canvasHeight);
+
+      const yScalecanvas = this.scaleYUpdateCanvasMap[scaleId];
+      const yScalecanvasCtx = yScalecanvas.node()?.getContext('2d');
+      const yScalecanvasWidth = +yScalecanvas.attr('width');
+      const yScalecanvasHeight = +yScalecanvas.attr('height');
+      if (yScalecanvasCtx) clearCanvas(yScalecanvasCtx, 0, 0, yScalecanvasWidth, yScalecanvasHeight);
+    });
+    const xScalecanvasCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
+    const xScalecanvasWidth = +this.scaleXUpdateCanvas.attr('width');
+    const xScalecanvasHeight = +this.scaleXUpdateCanvas.attr('height');
+    if (xScalecanvasCtx) clearCanvas(xScalecanvasCtx, 0, 0, xScalecanvasWidth, xScalecanvasHeight);
   }
 
 

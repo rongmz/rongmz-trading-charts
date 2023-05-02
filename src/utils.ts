@@ -202,3 +202,33 @@ export function drawGridLine(context: CanvasRenderingContext2D | null, color: st
     context.restore();
   }
 }
+
+
+/**
+ * Draw Filled box text
+ * @param context
+ * @param text
+ * @param backColor
+ * @param textColor
+ * @param x
+ * @param y
+ * @param h
+ * @param font
+ * @param align
+ * @param baseline
+ */
+export function drawBoxFilledText(context: CanvasRenderingContext2D | null, text: string, backColor: string, textColor: string, tx: number, ty: number, rx?: number, ry?: number, rw?: number, rh?: number, font?: string, align?: CanvasTextAlign, baseline?: CanvasTextBaseline) {
+  if (context !== null) {
+    context.save();
+    if (align) context.textAlign = align;
+    if (font) context.font = font;
+    if (baseline) context.textBaseline = baseline;
+    context.fillStyle = backColor;
+    const m = context.measureText(text);
+    rx = (!rx) ? tx - m.width / 2 : rx;
+    context.fillRect(rx, ry || 0, rw || m.width, rh || 0);
+    context.fillStyle = textColor;
+    context.fillText(text, tx, ty);
+    context.restore();
+  }
+}
