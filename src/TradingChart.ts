@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import {
   CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings,
-  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotLineType, ScaleRowMap,
+  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotData, PlotLineType, ScaleRowMap,
   X_AXIS_HEIGHT_PX, debug
 } from './types';
 import { clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
@@ -648,16 +648,16 @@ export class TradingChart {
         if (title) {
           const titleFontColor = ((this.settings.subGraph || {})[scaleId] || {}).titleFontColor || this.settings.scaleFontColor;
           const titleFontSize = ((this.settings.subGraph || {})[scaleId] || {}).titleFontSize || this.settings.scaleFontSize;
-          const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legend || this.settings.legend || 'top-center';
+          const titlePosition = ((this.settings.subGraph || {})[scaleId] || {}).titlePlacement || this.settings.titlePlacement || 'top-right';
           const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
           const legendMarginType = typeof (legendMargin);
-          switch (legendPosition) {
+          switch (titlePosition) {
             case 'top-center':
               drawText(mainCanvasCtx, title, canvasWidth / 2, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'center', 'top');
               break;
 
             case 'top-right':
-              drawText(mainCanvasCtx, title, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2], legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'right', 'top');
+              drawText(mainCanvasCtx, title, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0], undefined, titleFontColor, titleFontSize, 'right', 'top');
               break;
 
             case 'top-left':
@@ -684,9 +684,8 @@ export class TradingChart {
   private redrawUpdateCanvas() {
     // debug('redraw update canvas', this.mousePosition)
     // calculate
+    const windowedData = this.getWindowedData();
     const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
-    const xScaleWidth = +this.scaleXUpdateCanvas.attr('width');
-    const xScaleHeight = +this.scaleXUpdateCanvas.attr('height');
     const xstep = this.d3xScale.step();
     const bandW = this.d3xScale.bandwidth();
     const domainVal = this.d3xScale.domain()[Math.floor((this.mousePosition?.x || 0).toDevicePixel() / xstep)]
@@ -706,7 +705,7 @@ export class TradingChart {
 
       if (ctx) {
         drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
-
+        // draw only if this is the current scale subgraph
         if (this.mousePosition?.scaleId === scaleId) {
           const y = (this.mousePosition?.y || 0).toDevicePixel();
           const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
@@ -714,15 +713,43 @@ export class TradingChart {
           const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
           const yscalectx = yscalecanvas.node()?.getContext('2d');
           const yscalecanvasWidth = +yscalecanvas.attr('width');
-
           // draw y line
           drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
-
           if (yscalectx) {
             // y scale drawing
             drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
               0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, yscalecanvasWidth.toDevicePixel(), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
           }
+        }
+        // render legends at the current x coordinates
+        const matData = windowedData.find(v => v.ts.getTime() === domainVal.getTime());
+        if (matData) {
+          const plots = Object.keys(this.config[scaleId]);
+          const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
+
+          //------------------------------------
+          if (plotVals.length > 0) {
+            const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
+            const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
+            const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
+            const legendMarginType = typeof (legendMargin);
+            const formatter = d3.format(((this.settings.subGraph||{})[scaleId]||{}).legendFormat || this.settings.legendFormat);
+            plotVals.map((plotLegendVal, i) => {
+              const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
+              const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o} H ${plotLegendVal.d.d.h} L ${plotLegendVal.d.d.l} C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)}`;
+              debug('legend', scaleId, legendText, y, legendPosition);
+              switch (legendPosition) {
+                case 'top-right':
+                  drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
+                  break;
+
+                case 'top-left':
+                  drawText(ctx, legendText, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], y, undefined, plotLegendVal.d.color, legendFontSize, 'left', 'top');
+                  break;
+              }
+            });
+          }
+          //------------------------------------
         }
       }
     })

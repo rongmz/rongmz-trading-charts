@@ -71,6 +71,8 @@ export interface SubGraphSettings {
   title: string,
   /** sub graph title font size */
   titleFontSize: string,
+  /** title placement */
+  titlePlacement: 'top-left' | 'top-center' | 'top-right',
   /** sub graph title color */
   titleFontColor: string,
   /** y scale title */
@@ -84,11 +86,13 @@ export interface SubGraphSettings {
   /** Y scale padding pct */
   yScalePaddingPct: number,
   /** legend placement */
-  legend: 'top-left' | 'top-center' | 'top-right',
+  legendPosition: 'top-left' | 'top-right',
   /** legend font size */
   legendFontSize: string,
   /** Margin for legend placing */
   legendMargin: [number, number, number] | number,
+  /** Value formatter for legends */
+  legendFormat: string,
   /** Width of the strokes of lines */
   lineWidth: number,
   /** The ratio of subgraph section compared to entire graph  */
@@ -163,7 +167,9 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   watermarkText: '',
   title: '@rongmz/trading-charts',
   yScaleTitle: '₹',
-  legend: 'top-left',
+  legendPosition: 'top-left',
+  legendFontSize: '12px Arial',
+  legendFormat: '.3~f',
   lineWidth: 2,
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
@@ -174,7 +180,8 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   wheelZoomSensitivity: 0.01,
   xScaleFormat: '%d/%m, %H:%M',
   xScaleCrossHairFormat: '%d/%m, %H:%M',
-  crossHairYScaleFormat: '.2f',
+  crossHairYScaleFormat: '.2~f',
+  titlePlacement: 'top-right',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -194,7 +201,9 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   watermarkText: '',
   title: '@rongmz/trading-charts',
   yScaleTitle: '₹',
-  legend: 'top-left',
+  legendPosition: 'top-left',
+  legendFontSize: '12px Arial',
+  legendFormat: '.3~f',
   lineWidth: 2,
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
@@ -205,7 +214,8 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   wheelZoomSensitivity: 0.01,
   xScaleFormat: '%d/%m, %H:%M',
   xScaleCrossHairFormat: '%d/%m, %H:%M',
-  crossHairYScaleFormat: '.2f',
+  crossHairYScaleFormat: '.2~f',
+  titlePlacement: 'top-right',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
