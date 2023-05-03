@@ -63,7 +63,6 @@ export class TradingChart {
    * @param settings Cosmetic settings for the chart
    */
   constructor(private _root: HTMLElement, public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
-    // debug(`Instantiating trading chart.`, 'root', _root, 'config', config, 'settings', _settings);
 
     const scaleIds = Object.keys(config);
 
@@ -207,7 +206,6 @@ export class TradingChart {
             const scale1 = _[i], scale2 = _[i + 1];
             const scale1tds = this.scaleRowMap[scale1];
             const scale2tds = this.scaleRowMap[scale2];
-            // debug('drag', event.offsetY, scale1, scale2, scale1tds, scale2tds);
             const scale1newH = scale1tds.reduce((_, td) => {
               const h = parseFloat(td.style('height'));
               const newH = h + event.offsetY;
@@ -352,7 +350,6 @@ export class TradingChart {
       `.trimLines()).append('span').attr('style', 'white-space:break-spaces').html(this.settings.watermarkText);
     }
 
-    debug(this)
   }
 
   /**
@@ -682,7 +679,6 @@ export class TradingChart {
 
   /** Function responsible for redrawing update canvas for mouse positions and annotations on scales. */
   private redrawUpdateCanvas() {
-    // debug('redraw update canvas', this.mousePosition)
     // calculate
     const windowedData = this.getWindowedData();
     const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
@@ -727,17 +723,16 @@ export class TradingChart {
           const plots = Object.keys(this.config[scaleId]);
           const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
 
-          //------------------------------------
           if (plotVals.length > 0) {
             const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
             const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
             const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
             const legendMarginType = typeof (legendMargin);
-            const formatter = d3.format(((this.settings.subGraph||{})[scaleId]||{}).legendFormat || this.settings.legendFormat);
+            const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
             plotVals.map((plotLegendVal, i) => {
               const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
               const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o} H ${plotLegendVal.d.d.h} L ${plotLegendVal.d.d.l} C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)}`;
-              debug('legend', scaleId, legendText, y, legendPosition);
+
               switch (legendPosition) {
                 case 'top-right':
                   drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
@@ -749,7 +744,6 @@ export class TradingChart {
               }
             });
           }
-          //------------------------------------
         }
       }
     })

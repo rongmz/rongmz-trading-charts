@@ -4,6 +4,9 @@
 
 [![NPM](https://img.shields.io/npm/v/@rongmz/trading-charts.svg)](https://www.npmjs.com/package/@rongmz/trading-charts) [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
 
+## Screenshot
+![Screenshot](./example/chart-sample.png)
+
 ## Install
 
 ```bash
@@ -13,6 +16,8 @@ npm install @rongmz/trading-charts
 ## Usage
 
 See [example.html](https://github.com/rongmz/rongmz-trading-charts/tree/master/example/index.html)
+
+For configuration APIs see [types.ts](./src/types.ts)
 
 ## License
 
