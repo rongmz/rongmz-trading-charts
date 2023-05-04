@@ -267,3 +267,10 @@ export interface YCoordinateMap<T> {
 export interface D3YScaleMap {
   [scaleId: string]: d3.ScaleLinear<number, number>
 }
+
+
+export type ZoomPanType = 'zoom' | 'pan';
+export type ZoomPanListenerType = () => void
+
+export const EVENT_ZOOM = 'onzoom';
+export const EVENT_PAN = 'onpan';
