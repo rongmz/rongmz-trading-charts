@@ -220,10 +220,10 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
 }
 
 
-export const debug = (...msg: any[]) => console.log(msg);
-export const log = (...msg: any[]) => console.log(msg);
-export const warn = (...msg: any[]) => console.warn(msg);
-export const error = (...msg: any[]) => console.error(msg);
+export const debug = (...msg: any[]) => console.log(...msg);
+export const log = (...msg: any[]) => console.log(...msg);
+export const warn = (...msg: any[]) => console.warn(...msg);
+export const error = (...msg: any[]) => console.error(...msg);
 
 export type Interpolator<K, V> = (t: K) => V
 export interface CanvasMap {
