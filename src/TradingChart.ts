@@ -1,8 +1,11 @@
 import * as d3 from 'd3';
+import { EventEmitter } from 'events';
 import {
   CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings,
+  EVENT_PAN,
+  EVENT_ZOOM,
   GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotData, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, debug
+  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug
 } from './types';
 import { clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
 
@@ -53,6 +56,9 @@ export class TradingChart {
 
   private currentMouseDownStart?: MouseDownPosition;
   private mousePosition?: MousePosition;
+
+  private zoomEventEmitter = new EventEmitter();
+  private panEventEmitter = new EventEmitter();
 
 
 
@@ -350,7 +356,7 @@ export class TradingChart {
       `.trimLines()).append('span').attr('style', 'white-space:break-spaces').html(this.settings.watermarkText);
     }
 
-    // debug(this);
+    debug(this);
   }
 
   /**
@@ -416,6 +422,8 @@ export class TradingChart {
 
     this.updateWindowFromZoomPan();
     this.redrawMainCanvas();
+    // call any listeners
+    this.zoomEventEmitter.emit(EVENT_ZOOM);
   }
 
   /**
@@ -430,6 +438,8 @@ export class TradingChart {
     this.panOffset = Math.min(Math.max(0, this.panOffsetSaved + maxBarsToscroll), this.panOffset + windowLength);
     this.updateWindowFromZoomPan();
     this.redrawMainCanvas();
+    // call listeners
+    this.panEventEmitter.emit(EVENT_PAN);
   }
 
   /**
@@ -779,6 +789,73 @@ export class TradingChart {
    */
   public destroy() {
     const rootDetached = this.root.remove();
+    this.zoomEventEmitter.removeAllListeners();
+    this.panEventEmitter.removeAllListeners();
+  }
+
+
+  /**
+   * Add listener to events
+   * @param event
+   * @param listener
+   * @returns
+   */
+  public on(event: ZoomPanType, listener: ZoomPanListenerType) {
+    switch (event) {
+      case 'zoom':
+        return this.zoomEventEmitter.on(EVENT_ZOOM, listener);
+
+      case 'pan':
+        return this.panEventEmitter.on(EVENT_PAN, listener);
+    }
+  }
+
+  /**
+   * Add one off listener to events
+   * @param event
+   * @param listener
+   * @returns
+   */
+  public once(event: ZoomPanType, listener: ZoomPanListenerType) {
+    switch (event) {
+      case 'zoom':
+        return this.zoomEventEmitter.once(EVENT_ZOOM, listener);
+
+      case 'pan':
+        return this.panEventEmitter.once(EVENT_PAN, listener);
+    }
+  }
+
+  /**
+   * Remove a listener to events
+   * @param event
+   * @param listener
+   * @returns
+   */
+  public off(event: ZoomPanType, listener: ZoomPanListenerType) {
+    switch (event) {
+      case 'zoom':
+        return this.zoomEventEmitter.off(EVENT_ZOOM, listener);
+
+      case 'pan':
+        return this.panEventEmitter.off(EVENT_PAN, listener);
+    }
+  }
+
+  /**
+   * Remove all listeners for events
+   * @param event
+   * @param listener
+   * @returns
+   */
+  public offAll(event: ZoomPanType) {
+    switch (event) {
+      case 'zoom':
+        return this.zoomEventEmitter.removeAllListeners(EVENT_ZOOM);
+
+      case 'pan':
+        return this.panEventEmitter.removeAllListeners(EVENT_PAN);
+    }
   }
 
 
