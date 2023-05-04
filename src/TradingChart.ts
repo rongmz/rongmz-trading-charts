@@ -350,6 +350,7 @@ export class TradingChart {
       `.trimLines()).append('span').attr('style', 'white-space:break-spaces').html(this.settings.watermarkText);
     }
 
+    // debug(this);
   }
 
   /**
@@ -771,6 +772,13 @@ export class TradingChart {
     const xScalecanvasWidth = +this.scaleXUpdateCanvas.attr('width');
     const xScalecanvasHeight = +this.scaleXUpdateCanvas.attr('height');
     if (xScalecanvasCtx) clearCanvas(xScalecanvasCtx, 0, 0, xScalecanvasWidth, xScalecanvasHeight);
+  }
+
+  /**
+   * Cleanup the DOM and destroy all intermidiatery.
+   */
+  public destroy() {
+    const rootDetached = this.root.remove();
   }
 
 
