@@ -99,11 +99,10 @@ export function drawLine(context: CanvasRenderingContext2D | null, color: string
  * @param lineColor the line graph color
  * @param lineWidth line graph line width
  * @param areaColors area color gradient stops.
- * @param baseY area base line y
- * @param coordinates
+ * @param coordinates including base y [x, y, baseY][]
  */
-export function drawArea(context: CanvasRenderingContext2D | null, lineColor: string, lineWidth: number,
-  areaColors: string[], baseY: number, coordinates: number[][]) {
+export function drawArea(context: CanvasRenderingContext2D | null, lineColor: string, lineColorBaseY: string | undefined,
+  lineWidth: number, areaColors: string[], coordinates: number[][]) {
   if (context !== null && coordinates.length > 1) {
     context.save();
     context.lineWidth = lineWidth;
@@ -116,8 +115,8 @@ export function drawArea(context: CanvasRenderingContext2D | null, lineColor: st
     let miny = coordinates[0][1], maxy = coordinates[0][1];
     for (let i = 1; i < coordinates.length; i++) {
       const xy2 = coordinates[i];
-      miny = Math.min(miny, xy2[1]);
-      maxy = Math.max(maxy, xy2[1]);
+      miny = Math.min(miny, xy2[1], xy2[2]);
+      maxy = Math.max(maxy, xy2[1], xy2[2]);
       context.lineTo(xy2[0], xy2[1]);
     }
     context.stroke();
@@ -125,11 +124,25 @@ export function drawArea(context: CanvasRenderingContext2D | null, lineColor: st
     const gdt = context.createLinearGradient(0, miny, 0, maxy);
     areaColors.map((c, i) => gdt.addColorStop(i, c));
     context.fillStyle = gdt;
-    const cli = coordinates.length - 1;
-    context.lineTo(coordinates[cli][0], baseY);
-    context.lineTo(coordinates[0][0], baseY);
+    context.lineTo(coordinates[coordinates.length - 1][0], coordinates[coordinates.length - 1][2]);
+    for (let i = coordinates.length - 1; i > -1; i--) {
+      const x = coordinates[i][0];
+      const baseY = coordinates[i][2];
+      context.lineTo(x, baseY);
+    }
     context.globalCompositeOperation = 'destination-over';
     context.fill();
+    if (typeof (lineColorBaseY) !== 'undefined') {
+      context.beginPath();
+      context.moveTo(coordinates[0][0], coordinates[0][2]);
+      context.strokeStyle = lineColorBaseY;
+      for (let i = 0; i < coordinates.length; i++) {
+        const x = coordinates[i][0];
+        const baseY = coordinates[i][2];
+        context.lineTo(x, baseY);
+      }
+      context.stroke();
+    }
     context.restore();
   }
 }

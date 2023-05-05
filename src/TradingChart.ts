@@ -5,7 +5,7 @@ import {
   EVENT_PAN,
   EVENT_ZOOM,
   GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotData, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug
+  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, error
 } from './types';
 import { clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
 
@@ -373,15 +373,17 @@ export class TradingChart {
         const d = _data[plotConf.dataId] || [];
         const colorpallet = ((this.settings.subGraph || {})[scaleId] || {}).colorPallet || this.settings.colorPallet || d3.schemePaired;
         const defaultColor = colorpallet[i % colorpallet.length];
+        let lastBaseY: number | undefined = undefined;
         // loop thourgh d
         d.map(d => {
           const ts = plotConf.tsValue(d);
           const data = plotConf.data(d);
           const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
-
-          if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color } } };
-          else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color } };
-          else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color };
+          const baseY = (typeof (plotConf.baseY) === 'undefined') ? lastBaseY : (typeof (plotConf.baseY) === 'function' ? plotConf.baseY(d) : plotConf.baseY);
+          lastBaseY = baseY; // replace last
+          if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color, baseY } } };
+          else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color, baseY } };
+          else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color, baseY };
         })
       });
       return rv;
@@ -391,7 +393,8 @@ export class TradingChart {
     this.dataMat = xDomainValus.map(tsk => {
       return { ts: new Date(+tsk), data: dtgrouped[tsk] }
     });
-
+    // debug
+    debug(this.dataMat);
     this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
     this.updateWindowFromZoomPan();
     // draw main graph
@@ -467,8 +470,8 @@ export class TradingChart {
         let max = -Infinity, min = Infinity;
         Object.keys(d.data[scaleId]).map(plotName => {
           const plotd = d.data[scaleId][plotName];
-          max = Math.max(max, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d);
-          min = Math.min(min, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d);
+          max = Math.max(max, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d, plotd.baseY || -Infinity);
+          min = Math.min(min, typeof (plotd.d) === 'object' ? plotd.d.l : plotd.d, plotd.baseY || Infinity);
         });
         if (!rv[scaleId]) rv[scaleId] = { max, min };
         else {
@@ -553,11 +556,12 @@ export class TradingChart {
           const plotConfig = subgraphConfig[plotName];
           const subGraphSettings = (this.settings.subGraph || {})[scaleId] || {};
           const bandW = this.d3xScale.bandwidth();
+          const filteredWindowedData = windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName]));
           switch (plotConfig.type) {
 
             //--------------Candle plot------------
             case 'candle':
-              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+              filteredWindowedData.map(d => {
                 const _d = d.data[scaleId][plotName];
                 const _c = _d.d as CandlePlotData;
                 const x = this.d3xScale(d.ts) as number;
@@ -570,7 +574,7 @@ export class TradingChart {
             case 'dotted-line':
             case 'solid-line':
               drawLine(mainCanvasCtx, windowedData[windowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
-                (subGraphSettings.lineWidth || this.settings.lineWidth), windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+                (subGraphSettings.lineWidth || this.settings.lineWidth), filteredWindowedData.map(d => {
                   const _d = d.data[scaleId][plotName];
                   const x = this.d3xScale(d.ts) as number;
                   const y = d3yScale(_d.d as number);
@@ -580,7 +584,7 @@ export class TradingChart {
 
             //--------------bar plot------------
             case 'bar':
-              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+              filteredWindowedData.map(d => {
                 const _d = d.data[scaleId][plotName];
                 const x = this.d3xScale(d.ts) as number;
                 const y = d3yScale(_d.d as number);
@@ -590,11 +594,11 @@ export class TradingChart {
 
             //--------------var bar plot------------
             case 'var-bar':
-              const baseY = typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight;
-              windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+              filteredWindowedData.map(d => {
                 const _d = d.data[scaleId][plotName];
                 const x = this.d3xScale(d.ts) as number;
                 const y = d3yScale(_d.d as number);
+                const baseY = typeof (_d.baseY) !== 'undefined' ? d3yScale(_d.baseY) : canvasHeight;
                 drawBar(mainCanvasCtx, _d.color, x, y, bandW, baseY - y);
               });
               break;
@@ -602,14 +606,14 @@ export class TradingChart {
             //--------------area plot------------
             case 'area':
               const color = d3.color(windowedData[windowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
-              drawArea(mainCanvasCtx, color.formatHex8(), (subGraphSettings.lineWidth || this.settings.lineWidth),
-                [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()],
-                typeof (plotConfig.baseY) !== 'undefined' ? d3yScale(plotConfig.baseY) : canvasHeight,
-                windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName])).map(d => {
+              const areaColor = plotConfig.areaColor ? [plotConfig.areaColor, plotConfig.areaColor] : [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()];
+              drawArea(mainCanvasCtx, color.formatHex8(), plotConfig.colorBaseY, (subGraphSettings.lineWidth || this.settings.lineWidth),
+                areaColor, filteredWindowedData.map(d => {
                   const _d = d.data[scaleId][plotName];
                   const x = this.d3xScale(d.ts) as number;
                   const y = d3yScale(_d.d as number);
-                  return [x + bandW / 2, y];
+                  const baseY = typeof (_d.baseY) !== 'undefined' ? d3yScale(_d.baseY) : canvasHeight;
+                  return [x + bandW / 2, y, baseY];
                 }));
               break;
           }
@@ -690,74 +694,76 @@ export class TradingChart {
 
   /** Function responsible for redrawing update canvas for mouse positions and annotations on scales. */
   private redrawUpdateCanvas() {
-    // calculate
-    const windowedData = this.getWindowedData();
-    const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
-    const xstep = this.d3xScale.step();
-    const bandW = this.d3xScale.bandwidth();
-    const domainVal = this.d3xScale.domain()[Math.floor((this.mousePosition?.x || 0).toDevicePixel() / xstep)]
-    const x = (this.d3xScale(domainVal) || 0) + bandW / 2;
-    if (xScaleCtx) {
-      const text = `  ${d3.timeFormat(this.settings.xScaleCrossHairFormat)(domainVal)}  `;
-      drawBoxFilledText(xScaleCtx, text, this.settings.crossHairColor, this.settings.crossHairContrastColor, x, 5, undefined, 0, undefined,
-        parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'center', 'top');
-      // drawText(xScaleCtx, text, x, 0, undefined, this.settings.crossHairContrastColor, this.settings.scaleFontSize, 'center', 'top')
-    }
-
-    Object.keys(this.config).map(scaleId => {
-      const canvas = this.mainUpdateCanvasMap[scaleId];
-      const ctx = canvas.node()?.getContext('2d');
-      const canvasWidth = +canvas.attr('width');
-      const canvasHeight = +canvas.attr('height');
-
-      if (ctx) {
-        drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
-        // draw only if this is the current scale subgraph
-        if (this.mousePosition?.scaleId === scaleId) {
-          const y = (this.mousePosition?.y || 0).toDevicePixel();
-          const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
-          const yformatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).crossHairYScaleFormat || this.settings.crossHairYScaleFormat)
-          const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
-          const yscalectx = yscalecanvas.node()?.getContext('2d');
-          const yscalecanvasWidth = +yscalecanvas.attr('width');
-          // draw y line
-          drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
-          if (yscalectx) {
-            // y scale drawing
-            drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
-              0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, yscalecanvasWidth.toDevicePixel(), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
-          }
-        }
-        // render legends at the current x coordinates
-        const matData = windowedData.find(v => v.ts.getTime() === domainVal.getTime());
-        if (matData) {
-          const plots = Object.keys(this.config[scaleId]);
-          const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
-
-          if (plotVals.length > 0) {
-            const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
-            const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
-            const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
-            const legendMarginType = typeof (legendMargin);
-            const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
-            plotVals.map((plotLegendVal, i) => {
-              const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
-              const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o} H ${plotLegendVal.d.d.h} L ${plotLegendVal.d.d.l} C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)}`;
-
-              switch (legendPosition) {
-                case 'top-right':
-                  drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
-                  break;
-
-                case 'top-left':
-                  drawText(ctx, legendText, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], y, undefined, plotLegendVal.d.color, legendFontSize, 'left', 'top');
-                  break;
-              }
-            });
-          }
-        }
+    try {
+      // calculate
+      const windowedData = this.getWindowedData();
+      const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
+      const xstep = this.d3xScale.step();
+      const bandW = this.d3xScale.bandwidth();
+      const domainVal = this.d3xScale.domain()[Math.floor((this.mousePosition?.x || 0).toDevicePixel() / xstep)]
+      const x = (this.d3xScale(domainVal) || 0) + bandW / 2;
+      if (xScaleCtx) {
+        const text = `  ${d3.timeFormat(this.settings.xScaleCrossHairFormat)(domainVal)}  `;
+        drawBoxFilledText(xScaleCtx, text, this.settings.crossHairColor, this.settings.crossHairContrastColor, x, 5, undefined, 0, undefined,
+          parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'center', 'top');
+        // drawText(xScaleCtx, text, x, 0, undefined, this.settings.crossHairContrastColor, this.settings.scaleFontSize, 'center', 'top')
       }
-    })
+
+      Object.keys(this.config).map(scaleId => {
+        const canvas = this.mainUpdateCanvasMap[scaleId];
+        const ctx = canvas.node()?.getContext('2d');
+        const canvasWidth = +canvas.attr('width');
+        const canvasHeight = +canvas.attr('height');
+
+        if (ctx) {
+          drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
+          // draw only if this is the current scale subgraph
+          if (this.mousePosition?.scaleId === scaleId) {
+            const y = (this.mousePosition?.y || 0).toDevicePixel();
+            const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
+            const yformatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).crossHairYScaleFormat || this.settings.crossHairYScaleFormat)
+            const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
+            const yscalectx = yscalecanvas.node()?.getContext('2d');
+            const yscalecanvasWidth = +yscalecanvas.attr('width');
+            // draw y line
+            drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
+            if (yscalectx) {
+              // y scale drawing
+              drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
+                0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, yscalecanvasWidth.toDevicePixel(), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
+            }
+          }
+          // render legends at the current x coordinates
+          const matData = windowedData.find(v => v.ts.getTime() === domainVal.getTime());
+          if (matData) {
+            const plots = Object.keys(this.config[scaleId]);
+            const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
+
+            if (plotVals.length > 0) {
+              const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
+              const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
+              const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
+              const legendMarginType = typeof (legendMargin);
+              const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
+              plotVals.map((plotLegendVal, i) => {
+                const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
+                const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o}   H ${plotLegendVal.d.d.h}   L ${plotLegendVal.d.d.l}   C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)} ${(typeof (plotLegendVal.d.baseY) !== 'undefined') && `   BaseY: ${formatter(plotLegendVal.d.baseY)}`}`;
+
+                switch (legendPosition) {
+                  case 'top-right':
+                    drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
+                    break;
+
+                  case 'top-left':
+                    drawText(ctx, legendText, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], y, undefined, plotLegendVal.d.color, legendFontSize, 'left', 'top');
+                    break;
+                }
+              });
+            }
+          }
+        }
+      })
+    } catch (e) { error(e); }
   }
 
   /**
@@ -788,7 +794,7 @@ export class TradingChart {
    * Cleanup the DOM and destroy all intermidiatery.
    */
   public destroy() {
-    const rootDetached = this.root.remove();
+    this.root.remove();
     this.zoomEventEmitter.removeAllListeners();
     this.panEventEmitter.removeAllListeners();
   }
