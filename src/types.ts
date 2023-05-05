@@ -26,6 +26,8 @@ export interface SubGraphConfig {
 
 export type PlotLineType = 'solid-line' | 'dashed-line' | 'dotted-line'
 
+export type ValueExtractor<T> = (data: TsOLHCVCandle | TsValue | any) => T;
+
 /** Data based config for each plot */
 export interface PlotConfig {
   /** Plot type */
@@ -33,13 +35,17 @@ export interface PlotConfig {
   /** The dataId in data */
   dataId: string,
   /** timestamp extactor in data timestamp will be in string */
-  tsValue: (data: TsOLHCVCandle | TsValue | any) => Date,
+  tsValue: ValueExtractor<Date>,
   /** data extractor */
-  data: (data: TsOLHCVCandle | TsValue | any) => PlotData,
+  data: ValueExtractor<PlotData>,
   /** Only for area plot, the base Y value of the plot */
-  baseY?: number,
+  baseY?: number | ValueExtractor<number>,
+  /** This is the color for the baseY line if any. If no color then line wont be drawn */
+  colorBaseY?: string,
   /** Dynamic coloring based on each value or overall coloring */
-  color?: string | ((data: TsOLHCVCandle | TsValue | any) => string),
+  color?: string | (ValueExtractor<string>),
+  /** Area fill Color. if no area color, then fill type will be gradient */
+  areaColor?: string
 }
 
 
@@ -56,7 +62,8 @@ export interface DataMat {
     [scaleId: string]: {
       [plotName: string]: {
         d: PlotData,
-        color: string
+        color: string,
+        baseY?: number
       }
     }
   }
