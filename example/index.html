@@ -38,7 +38,7 @@
                 color: 'red',
                 baseY: d => (d[2] - 3),
                 colorBaseY: '#007723',
-                areaColor: '#8cfeadaa',
+                areaColor: '#8cfead33',
               }
             },
             volume: {
@@ -100,7 +100,16 @@
           .then(data => {
             console.log('data=', data);
             chart.setData(data);
-          })
+          });
+        // fetch data and set
+        fetch("/annotations.json", {
+          "headers": { "accept": "application/json" },
+          "method": "GET"
+        }).then(res => res.json())
+          .then(data => {
+            console.log('annotations json=', data);
+            chart.setAnnotations(data);
+          });
       }
     }
     checkLoadComplete();

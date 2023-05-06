@@ -152,6 +152,10 @@ export interface ChartSettings extends SubGraphSettings {
   zoomLevel: number,
   /** The sensitivity of mouse wheel zoom (< 1) detailed and slow zooming keep value very very low. */
   wheelZoomSensitivity: number,
+  /** Annotation Line Width */
+  annotationLineWidth: number,
+  /** Annotation font */
+  annotationFontSize: string,
   /** Individual settings for each scale sections */
   subGraph: {
     [scaleId: string]: SubGraphSettings
@@ -177,7 +181,7 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   legendPosition: 'top-left',
   legendFontSize: '12px Arial',
   legendFormat: '.3~f',
-  lineWidth: 2,
+  lineWidth: 1,
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
   legendMargin: 10,
@@ -189,6 +193,8 @@ export const LightThemeChartSettings: Partial<ChartSettings> = {
   xScaleCrossHairFormat: '%d/%m, %H:%M',
   crossHairYScaleFormat: '.2~f',
   titlePlacement: 'top-right',
+  annotationLineWidth: 1,
+  annotationFontSize: '12px Arial',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -211,7 +217,7 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   legendPosition: 'top-left',
   legendFontSize: '12px Arial',
   legendFormat: '.3~f',
-  lineWidth: 2,
+  lineWidth: 1,
   plotSectionRatio: 0.94,
   yScaleTickCount: 5,
   legendMargin: 10,
@@ -223,6 +229,8 @@ export const DarkThemeChartSettings: Partial<ChartSettings> = {
   xScaleCrossHairFormat: '%d/%m, %H:%M',
   crossHairYScaleFormat: '.2~f',
   titlePlacement: 'top-right',
+  annotationLineWidth: 1,
+  annotationFontSize: '12px Arial',
   // scaleSectionRatio will be calculated based on scales given if not provided expicitly
 }
 
@@ -281,3 +289,26 @@ export type ZoomPanListenerType = () => void
 
 export const EVENT_ZOOM = 'onzoom';
 export const EVENT_PAN = 'onpan';
+
+export type AnnotationType = 'xRange' | 'flag' | 'rect'
+
+export interface Annotation {
+  /** Annotation type */
+  type: AnnotationType,
+  /** Optional scale Id. If no scaleId given then applied on all subgraphs. */
+  scaleId?: string,
+  /** Text description for annotation */
+  text: string,
+  /** primary color. (Optional) */
+  color: string,
+  /** area color specially for rect and range annotations  (Optional)*/
+  areaColor: string,
+  /** optional text color */
+  textColor: string,
+  /** The x values */
+  x: Date[],
+  /** The y values */
+  y: number[],
+  /** direction specially for flag type  (Optional) */
+  direction: 'up' | 'down'
+}
