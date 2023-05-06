@@ -301,11 +301,13 @@ export class TradingChart {
       d3Canvas.on('mousedown', event => {
         event.preventDefault();
         this.currentMouseDownStart = { scaleId, x: event.x, y: event.y };
+        this.scaleRowMap[scaleId][0].style('cursor', 'grabbing');
       })
       d3Canvas.on('mouseup', event => {
         event.preventDefault();
         this.currentMouseDownStart = undefined;
         this.panOffsetSaved = this.panOffset;
+        this.scaleRowMap[scaleId][0].style('cursor', 'crosshair');
       });
       d3Canvas.on('mousemove', (event: MouseEvent) => {
         event.preventDefault();
