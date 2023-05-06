@@ -24,9 +24,10 @@
   "engines": {
     "node": ">=14"
   },
+  "main": "src/index.ts",
   "scripts": {
-    "clean": "shx rm -rf _bundles lib lib-esm",
-    "build:webpack": "tsc && tsc -m es6 --outDir lib-esm && webpack",
+    "clean": "shx rm -rf _bundles lib src/webpack-build.ts",
+    "build:webpack": "tsc && webpack --env web",
     "build": "npm run clean && npm run build:webpack",
     "start": "webpack serve",
     "doPublish": "npm run build && npm publish --access public"

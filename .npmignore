@@ -20,3 +20,5 @@ example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+src/webpack-build.ts*
