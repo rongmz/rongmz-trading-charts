@@ -1,13 +1,14 @@
 import * as d3 from 'd3';
 import { EventEmitter } from 'events';
 import {
-  CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings,
-  EVENT_PAN,
-  EVENT_ZOOM,
-  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotData, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, error
+  Annotation, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings, EVENT_PAN, EVENT_ZOOM,
+  GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotLineType, ScaleRowMap,
+  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, log
 } from './types';
-import { clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawLine, drawText } from './utils';
+import {
+  clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawFlagMark, drawLine,
+  drawRectLimiterMark, drawText, drawXRange
+} from './utils';
 
 declare global {
   interface String {
@@ -59,6 +60,8 @@ export class TradingChart {
 
   private zoomEventEmitter = new EventEmitter();
   private panEventEmitter = new EventEmitter();
+
+  private annotations: Annotation[] = [];
 
 
 
@@ -359,6 +362,12 @@ export class TradingChart {
     debug(this);
   }
 
+  /** Get a color pallet */
+  private getColorPallet(scaleId?: string) {
+    const colorpallet = (scaleId ? ((this.settings.subGraph || {})[scaleId] || {}).colorPallet : undefined) || this.settings.colorPallet || d3.schemePaired;
+    return colorpallet;
+  }
+
   /**
    * Set the data to the the existing chart.
    * This triggers rendering for the entire chart based on changes.
@@ -371,7 +380,7 @@ export class TradingChart {
       Object.keys(subgraph).map((plotName, i) => {
         const plotConf = subgraph[plotName];
         const d = _data[plotConf.dataId] || [];
-        const colorpallet = ((this.settings.subGraph || {})[scaleId] || {}).colorPallet || this.settings.colorPallet || d3.schemePaired;
+        const colorpallet = this.getColorPallet(scaleId);
         const defaultColor = colorpallet[i % colorpallet.length];
         let lastBaseY: number | undefined = undefined;
         // loop thourgh d
@@ -398,6 +407,28 @@ export class TradingChart {
     this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
     this.updateWindowFromZoomPan();
     // draw main graph
+    this.redrawMainCanvas();
+  }
+
+  /**
+   * Set chart annotations.
+   * @param _annotations
+   */
+  public setAnnotations(_annotations: Partial<Annotation>[]) {
+    this.annotations = _annotations.map((a, i) => {
+      if (typeof (a.color) === 'undefined') {
+        const colorPallet = this.getColorPallet(a.scaleId);
+        a.color = colorPallet[i];
+        if (typeof (a.areaColor) === 'undefined') {
+          a.areaColor = d3.color(colorPallet[i])?.copy({ opacity: 0.2 }).formatHex8() || colorPallet[i];
+        }
+      }
+      if (typeof (a.text) === 'undefined') a.text = `${i + 1}`;
+      a.x = (a.x || []).map(x => ((Object.prototype.toString.call(x) === '[object Date]') ? x : new Date(x)));
+      if (typeof (a.textColor) === 'undefined') a.textColor = this.settings.crossHairContrastColor;
+      return a as Annotation; // return enriched
+    });
+    // ask for redraw.
     this.redrawMainCanvas();
   }
 
@@ -679,6 +710,35 @@ export class TradingChart {
         }
         // -----------------------------------END: Draw title------------------------------------------------
 
+        // -----------------------------------START: Try to draw annotations------------------------------------------------
+        const annotations = this.annotations.filter(a => ((a.scaleId === scaleId) || (typeof (a.scaleId) === 'undefined')));
+        if (annotations && annotations.length > 0) {
+          debug('annotations', scaleId, annotations);
+          const lineWidth = this.settings.annotationLineWidth;
+          const annotationFontSize = this.settings.annotationFontSize;
+          const xBandW = this.d3xScale.bandwidth();
+          annotations.map(annotation => {
+            const x = annotation.x.map(_ => this.d3xScale(_) as number);
+            const y = annotation.y.map(_ => d3yScale(_) as number);
+            switch (annotation.type) {
+              case 'xRange':
+                if (x.length > 1) drawXRange(mainCanvasCtx, x[0], x[1], canvasHeight, annotation.color, lineWidth, annotation.areaColor, annotation.text, annotationFontSize);
+                break;
+
+              case 'flag':
+                x.map((x, i) => {
+                  drawFlagMark(mainCanvasCtx, x + xBandW / 2, y[i], annotation.text, annotation.direction, annotation.color, annotation.textColor, annotationFontSize);
+                })
+                break;
+
+              case 'rect':
+                drawRectLimiterMark(mainCanvasCtx, x[0], x[1], y[0], y[1], y[2], y[3], annotation.color, lineWidth, annotation.areaColor, annotation.text, annotationFontSize)
+                break;
+            }
+          })
+        }
+        // -----------------------------------END: Try to draw annotations------------------------------------------------
+
       });
 
       // ----------------Draw X axis-----------------------
@@ -687,6 +747,15 @@ export class TradingChart {
         const x = this.d3xScale(d) as number;
         drawText(xScaleCanvasCtx, xScaleFormat(d), x, xscaleY, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
       });
+
+      // -------------------Draw for only xrange annotations to xscale-------------------------------
+      this.annotations.filter(a => (a.type === 'xRange' && a.x.length > 1)).map(annotation => {
+        const x = annotation.x.map(_ => this.d3xScale(_) as number);
+        const txt = annotation.x.map(_ => xScaleFormat(_));
+        const rh = parseInt(this.settings.annotationFontSize);
+        drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
+        drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+      })
 
     }
   }
@@ -747,7 +816,7 @@ export class TradingChart {
               const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
               plotVals.map((plotLegendVal, i) => {
                 const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
-                const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o}   H ${plotLegendVal.d.d.h}   L ${plotLegendVal.d.d.l}   C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)} ${(typeof (plotLegendVal.d.baseY) !== 'undefined') && `   BaseY: ${formatter(plotLegendVal.d.baseY)}`}`;
+                const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o}   H ${plotLegendVal.d.d.h}   L ${plotLegendVal.d.d.l}   C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)} ${(typeof (plotLegendVal.d.baseY) !== 'undefined') ? `   BaseY: ${formatter(plotLegendVal.d.baseY)}` : ''}`;
 
                 switch (legendPosition) {
                   case 'top-right':
@@ -763,7 +832,7 @@ export class TradingChart {
           }
         }
       })
-    } catch (e) { error(e); }
+    } catch (e) { log(e); }
   }
 
   /**

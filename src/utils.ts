@@ -238,10 +238,170 @@ export function drawBoxFilledText(context: CanvasRenderingContext2D | null, text
     if (baseline) context.textBaseline = baseline;
     context.fillStyle = backColor;
     const m = context.measureText(text);
-    rx = (!rx) ? tx - m.width / 2 : rx;
-    context.fillRect(rx, ry || 0, rw || m.width, rh || 0);
+    if (typeof (rx) === 'undefined') {
+      switch (align) {
+        case 'center':
+          rx = tx - m.width / 2;
+          break;
+
+        default:
+          rx = tx;
+      }
+    }
+    context.fillRect(rx, ry || 0, (rw || m.width) * (align === 'right' ? -1 : 1), rh || 0);
     context.fillStyle = textColor;
     context.fillText(text, tx, ty);
+    context.restore();
+  }
+}
+
+
+/**
+ * Draw x Range annotation
+ * @param context
+ * @param x1
+ * @param x2
+ * @param h
+ * @param lineColor
+ * @param lineWidth
+ * @param areaColor
+ * @param text
+ */
+export function drawXRange(
+  context: CanvasRenderingContext2D | null,
+  x1: number,
+  x2: number,
+  h: number,
+  lineColor: string,
+  lineWidth: number,
+  areaColor: string,
+  text?: string,
+  fontSize?: string,
+) {
+  if (context !== null) {
+    context.save();
+    context.lineWidth = lineWidth;
+    context.strokeStyle = lineColor;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.beginPath();
+    context.moveTo(x1, 0);
+    context.lineTo(x1, h);
+    context.moveTo(x2, 0);
+    context.lineTo(x2, h);
+    context.stroke();
+    context.fillStyle = areaColor;
+    context.fillRect(x1, 0, x2 - x1, h);
+
+    if (typeof (text) !== 'undefined' && !!fontSize) {
+      context.textAlign = 'center';
+      context.textBaseline = 'top';
+      context.font = fontSize;
+      context.fillStyle = lineColor;
+      context.fillText(text, x1 + (x2 - x1) / 2, 10);
+    }
+    context.restore();
+  }
+}
+
+
+/**
+ * Draw a Flag mark in the given chart context
+ * @param context
+ * @param x
+ * @param y
+ * @param text
+ * @param direction
+ * @param color
+ * @param textColor
+ * @param fontSize
+ */
+export function drawFlagMark(
+  context: CanvasRenderingContext2D | null,
+  x: number,
+  y: number,
+  text: string,
+  direction: 'up' | 'down',
+  color: string,
+  textColor: string,
+  fontSize: string,
+) {
+  if (context !== null) {
+    context.save();
+    const dir = direction === 'up' ? -1 : 1;
+    const markerH = parseFloat(fontSize) * 2;
+    const markerW = parseFloat(fontSize) * 1.4;
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(x - markerW, y + dir * markerH);
+    context.lineTo(x + markerW, y + dir * markerH);
+    context.fill();
+    context.fillStyle = textColor;
+    context.textAlign = 'center';
+    context.textBaseline = direction === 'up' ? 'bottom' : 'top';
+    context.fillText(text[0] || '', x, y + dir * markerH * 0.4);
+    context.restore();
+  }
+}
+
+
+/**
+ * Draw a Rect type annotation.
+ * see https://github.com/rongmz/rongmz-trading-charts/issues/1
+ * @param context
+ * @param x1
+ * @param x2
+ * @param y11
+ * @param y12
+ * @param y21
+ * @param y22
+ * @param lineColor
+ * @param lineWidth
+ * @param areaColor
+ * @param text
+ * @param textColor
+ * @param fontSize
+ */
+export function drawRectLimiterMark(
+  context: CanvasRenderingContext2D | null,
+  x1: number, x2: number,
+  y11: number, y12: number, y21: number, y22: number,
+  lineColor: string,
+  lineWidth: number,
+  areaColor: string,
+  text?: string,
+  fontSize?: string,
+) {
+  if (context !== null) {
+    context.save();
+    context.lineCap = 'round';
+    context.strokeStyle = lineColor;
+    context.lineWidth = lineWidth;
+    context.beginPath();
+    context.moveTo(x1, y11);
+    context.lineTo(x2, y21);
+    context.moveTo(x1, y12);
+    context.lineTo(x2, y22);
+    context.stroke();
+    context.fillStyle = areaColor;
+    context.beginPath();
+    context.moveTo(x1, y11);
+    context.lineTo(x1, y12);
+    context.lineTo(x2, y22);
+    context.lineTo(x2, y21);
+    context.fill();
+    if (text && fontSize) {
+      context.font = fontSize;
+      context.textAlign = 'center';
+      context.textBaseline = 'bottom';
+      context.fillStyle = lineColor;
+      const tx = x1 + (x2 - x1) / 2,
+        ty = y12 - (y22 - y12) / 2;
+      context.translate(tx, ty);
+      context.rotate((y22 - y12) / (x2 - x1));
+      context.fillText(text, 0, lineWidth / 2 + 1)
+    }
     context.restore();
   }
 }
