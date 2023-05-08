@@ -71,7 +71,7 @@ export class TradingChart {
    * @param config Data based config for the entire chart
    * @param settings Cosmetic settings for the chart
    */
-  constructor(private _root: HTMLElement, public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
+  constructor(public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
 
     const scaleIds = Object.keys(config);
 
@@ -81,8 +81,7 @@ export class TradingChart {
       _settings, { scaleSectionRatio: (1 / scaleIds.length) }) as ChartSettings;
 
     // d3 root
-    this.root = d3.select(_root).append('div')
-      .style('position', 'relative')
+    this.root = d3.select(document.createElement('div')).style('position', 'relative')
 
     // now create tabular view based on given config and scales
     this.table = this.root.append('table').attr('class', 'chartTable').attr('style', `
@@ -862,12 +861,20 @@ export class TradingChart {
   }
 
   /**
-   * Cleanup the DOM and destroy all intermidiatery.
+   * Detach the chart root from DOM.
    */
-  public destroy() {
+  public detach() {
     this.root.remove();
     this.zoomEventEmitter.removeAllListeners();
     this.panEventEmitter.removeAllListeners();
+  }
+
+  /**
+   * Attach to given DOM root node
+   */
+  public attach(domRoot: HTMLElement) {
+    const _root = this.root.node();
+    if (_root) domRoot.appendChild(_root);
   }
 
 

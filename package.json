@@ -1,6 +1,6 @@
 {
   "name": "@rongmz/trading-charts",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "This is a d3 based charting library for stocks and finance world. If the question is, why another chart library? - Coz, I find no &quot;open-source&quot; library fits my requirements.",
   "author": {
     "name": "Rounak Saha",
