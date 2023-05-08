@@ -12,7 +12,7 @@
     "customized-charts",
     "candlesticks"
   ],
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache License 2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rongmz/rongmz-trading-charts.git"
