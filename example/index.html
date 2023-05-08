@@ -20,7 +20,7 @@
     function checkLoadComplete() {
       if (!window.rongmz) setTimeout(checkLoadComplete, 1000);
       else {
-        const chart = new rongmz.TradingChart(document.getElementById('root'),
+        const chart = new rongmz.TradingChart(
           {
             candle: {
               candle: {
@@ -110,6 +110,8 @@
             console.log('annotations json=', data);
             chart.setAnnotations(data);
           });
+        // attach the chart
+        chart.attach(document.getElementById('root'));
       }
     }
     checkLoadComplete();
