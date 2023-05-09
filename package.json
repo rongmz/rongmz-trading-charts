@@ -1,6 +1,6 @@
 {
   "name": "@rongmz/trading-charts",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "This is a d3 based charting library for stocks and finance world. If the question is, why another chart library? - Coz, I find no &quot;open-source&quot; library fits my requirements.",
   "author": {
     "name": "Rounak Saha",
@@ -33,10 +33,10 @@
     "doPublish": "npm run build && npm publish --access public"
   },
   "dependencies": {
+    "@types/d3": "^7.4.0",
     "d3": "^7.8.4"
   },
   "devDependencies": {
-    "@types/d3": "^7.4.0",
     "html-webpack-plugin": "^5.5.0",
     "shx": "^0.3.4",
     "ts-loader": "^9.4.2",
