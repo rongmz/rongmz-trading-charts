@@ -10,20 +10,9 @@ import {
   drawRectLimiterMark, drawText, drawXRange
 } from './utils';
 
-declare global {
-  interface String {
-    trimLines(): string;
-  }
-  interface Number {
-    toDevicePixel(): number;
-  }
-}
-String.prototype.trimLines = function (this: string) {
-  return this.replace(/\n\s+/g, '');
-}
-Number.prototype.toDevicePixel = function (this: number) {
-  return this * window.devicePixelRatio;
-}
+const trimLines = (string: string) => string.replace(/\n\s+/g, '');
+const toDevicePixel = (number: number) => (number * window.devicePixelRatio);
+
 
 export class TradingChart {
 
@@ -33,9 +22,9 @@ export class TradingChart {
 
   private settings: ChartSettings;
   /** Chart root element provided as container */
-  private root;
+  private root: d3.Selection<HTMLDivElement, any, any, any> | undefined = undefined;
   /** internal maintable */
-  private table;
+  private table: d3.Selection<HTMLTableElement, any, any, any> | undefined = undefined;
   /** Internal Td map */
   private scaleRowMap: ScaleRowMap = {};
 
@@ -45,8 +34,8 @@ export class TradingChart {
   private scaleYCanvasMap: CanvasMap = {};
   private scaleYUpdateCanvasMap: CanvasMap = {};
 
-  private scaleXCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
-  private scaleXUpdateCanvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+  private scaleXCanvas: d3.Selection<HTMLCanvasElement, any, any, any> | undefined = undefined;
+  private scaleXUpdateCanvas: d3.Selection<HTMLCanvasElement, any, any, any> | undefined = undefined;
 
   private zoomInterpolator: Interpolator<number, number> = d3.interpolateNumber(0, 0);
   private panOffset: number = 0;
@@ -72,7 +61,6 @@ export class TradingChart {
    * @param settings Cosmetic settings for the chart
    */
   constructor(public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
-
     const scaleIds = Object.keys(config);
 
     // save settings
@@ -80,11 +68,21 @@ export class TradingChart {
       (theme === 'dark' ? DarkThemeChartSettings : LightThemeChartSettings),
       _settings, { scaleSectionRatio: (1 / scaleIds.length) }) as ChartSettings;
 
+    // auto Initialize at first
+    this.initialize();
+    debug(this);
+  }
+
+  /** Initializes all dom nodes. This is a heavy loading process. This is called automatically at first initialization. This does not attch the root to DOM. */
+  public initialize() {
+    // get scale ids
+    const scaleIds = Object.keys(this.config);
+
     // d3 root
-    this.root = d3.select(document.createElement('div')).style('position', 'relative')
+    this.root = d3.select(document.createElement('div')).style('position', 'relative');
 
     // now create tabular view based on given config and scales
-    this.table = this.root.append('table').attr('class', 'chartTable').attr('style', `
+    const table = this.root.append('table').attr('class', 'chartTable').attr('style', trimLines(`
       position: absolute;
       width: ${this.settings.width}px;
       height: ${this.settings.height}px;
@@ -97,8 +95,9 @@ export class TradingChart {
       margin: 0;
       padding: 0;
       background: ${this.settings.background}
-    `.trimLines());
+    `));
 
+    this.table = table;
     const chartSectionWidth = this.settings.width * this.settings.plotSectionRatio;
     const scaleSectionWidth = this.settings.width - chartSectionWidth;
     const chartHeight = this.settings.height - scaleIds.length - X_AXIS_HEIGHT_PX;
@@ -108,8 +107,8 @@ export class TradingChart {
         ((this.settings.subGraph || {})[scaleId]?.deltaHeight || 0);
 
       // append tr and canvas within
-      const tr = this.table.append('tr').attr('class', `subChart ${scaleId}`)
-      const graphTd = tr.append('td').attr('class', `section ${scaleId}`).attr('style', `
+      const tr = table.append('tr').attr('class', `subChart ${scaleId}`)
+      const graphTd = tr.append('td').attr('class', `section ${scaleId}`).attr('style', trimLines(`
         border: none;
         line-height: 0px;
         margin: 0;
@@ -120,15 +119,15 @@ export class TradingChart {
         overflow: hidden;
         width: ${chartSectionWidth}px;
         height: ${sectionHeight}px;
-      `.trimLines())
-      const graphContainer = graphTd.append('div').attr('class', `canvasContainer ${scaleId}`).attr('style', `
+      `))
+      const graphContainer = graphTd.append('div').attr('class', `canvasContainer ${scaleId}`).attr('style', trimLines(`
         width:100%;
         height:100%;
         position: relative;
         overflow: hidden;
-      `.trimLines())
+      `))
 
-      this.mainCanvasMap[scaleId] = graphContainer.append('canvas').attr('class', `mainCanvas ${scaleId}`).attr('style', `
+      this.mainCanvasMap[scaleId] = graphContainer.append('canvas').attr('class', `mainCanvas ${scaleId}`).attr('style', trimLines(`
         user-select: none;
         -webkit-tap-highlight-color: transparent;
         width: ${chartSectionWidth}px;
@@ -136,9 +135,12 @@ export class TradingChart {
         position: absolute;
         left: 0px;
         top: 0px;
-      `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', sectionHeight.toDevicePixel()).attr('scaleId', scaleId).attr('canvasType', 'mainCanvas');
+      `))
+        .attr('width', toDevicePixel(chartSectionWidth))
+        .attr('height', toDevicePixel(sectionHeight))
+        .attr('scaleId', scaleId).attr('canvasType', 'mainCanvas');
 
-      this.mainUpdateCanvasMap[scaleId] = graphContainer.append('canvas').attr('class', `mainUpdateCanvas ${scaleId}`).attr('style', `
+      this.mainUpdateCanvasMap[scaleId] = graphContainer.append('canvas').attr('class', `mainUpdateCanvas ${scaleId}`).attr('style', trimLines(`
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       width: ${chartSectionWidth}px;
@@ -147,9 +149,13 @@ export class TradingChart {
       left: 0px;
       top: 0px;
       z-index: 1;
-    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', sectionHeight.toDevicePixel()).attr('scaleId', scaleId).attr('canvasType', 'mainUpdateCanvas');
+    `))
+        .attr('width', toDevicePixel(chartSectionWidth))
+        .attr('height', toDevicePixel(sectionHeight))
+        .attr('scaleId', scaleId)
+        .attr('canvasType', 'mainUpdateCanvas');
 
-      const rightScaleTd = tr.append('td').attr('class', `scale ${scaleId}`).attr('style', `
+      const rightScaleTd = tr.append('td').attr('class', `scale ${scaleId}`).attr('style', trimLines(`
         border-left: 1px solid ${this.settings.graphSeparatorColor};
         line-height: 0px;
         margin: 0;
@@ -159,14 +165,14 @@ export class TradingChart {
         width: ${scaleSectionWidth}px;
         min-width: ${scaleSectionWidth}px;
         height: ${sectionHeight}px;
-      `.trimLines())
-      const rightScaleContainer = rightScaleTd.append('div').attr('class', `scaleContainer ${scaleId}`).attr('style', `
+      `))
+      const rightScaleContainer = rightScaleTd.append('div').attr('class', `scaleContainer ${scaleId}`).attr('style', trimLines(`
         width:100%;
         height:100%;
         position: relative;
         overflow: hidden;
-      `.trimLines())
-      this.scaleYCanvasMap[scaleId] = rightScaleContainer.append('canvas').attr('class', `scaleYCanvas ${scaleId}`).attr('style', `
+      `))
+      this.scaleYCanvasMap[scaleId] = rightScaleContainer.append('canvas').attr('class', `scaleYCanvas ${scaleId}`).attr('style', trimLines(`
         user-select: none;
         -webkit-tap-highlight-color: transparent;
         width: ${scaleSectionWidth}px;
@@ -174,8 +180,12 @@ export class TradingChart {
         position: absolute;
         left: 0px;
         top: 0px;
-      `.trimLines()).attr('width', scaleSectionWidth.toDevicePixel()).attr('height', sectionHeight.toDevicePixel()).attr('scaleId', scaleId).attr('canvasType', 'scaleYCanvas');
-      this.scaleYUpdateCanvasMap[scaleId] = rightScaleContainer.append('canvas').attr('class', `scaleYUpdateCanvas ${scaleId}`).attr('style', `
+      `))
+        .attr('width', toDevicePixel(scaleSectionWidth))
+        .attr('height', toDevicePixel(sectionHeight))
+        .attr('scaleId', scaleId).attr('canvasType', 'scaleYCanvas');
+
+      this.scaleYUpdateCanvasMap[scaleId] = rightScaleContainer.append('canvas').attr('class', `scaleYUpdateCanvas ${scaleId}`).attr('style', trimLines(`
         user-select: none;
         -webkit-tap-highlight-color: transparent;
         width: ${scaleSectionWidth}px;
@@ -185,21 +195,27 @@ export class TradingChart {
         top: 0px;
         z-index: 1;
         cursor: ns-resize;
-      `.trimLines()).attr('width', scaleSectionWidth.toDevicePixel()).attr('height', sectionHeight.toDevicePixel()).attr('scaleId', scaleId).attr('canvasType', 'scaleYUpdateCanvas');
+      `))
+        .attr('width', toDevicePixel(scaleSectionWidth))
+        .attr('height', toDevicePixel(sectionHeight))
+        .attr('scaleId', scaleId)
+        .attr('canvasType', 'scaleYUpdateCanvas');
 
       // save ref to row map
       this.scaleRowMap[scaleId] = [graphTd, rightScaleTd];
 
       if (i < _.length - 1) {
-        const separatorhandle = this.table
+        const separatorhandle = table
           .append('tr').attr('style', `height: 1px;`)
-          .append('td').attr('colspan', '2').attr('style', `
+          .append('td').attr('colspan', '2').attr('style', trimLines(`
             margin: 0;
             padding: 0;
             position: relative;
             background: ${this.settings.graphSeparatorColor}
-          `.trimLines())
-          .append('div').attr('class', 'separatorHandle').attr('style', `
+          `))
+          .append('div')
+          .attr('class', 'separatorHandle')
+          .attr('style', trimLines(`
             height: 9px;
             left: 0;
             position: absolute;
@@ -207,7 +223,11 @@ export class TradingChart {
             width: 100%;
             z-index: 50;
             cursor: row-resize;
-          `.trimLines()).attr('draggable', true).attr('scale1', _[i]).attr('scale2', _[i + 1]);
+          `))
+          .attr('draggable', true)
+          .attr('scale1', _[i])
+          .attr('scale2', _[i + 1]);
+
         // attach dragging and resize functionality and listener
         separatorhandle.on('drag', (event) => {
           if (event.pageY && event.offsetY) { // work around for drag end
@@ -227,15 +247,15 @@ export class TradingChart {
               return newH;
             }, 0);
             // change canvas h
-            this.mainCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', scale1newH.toDevicePixel());
-            this.mainUpdateCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', scale1newH.toDevicePixel());
-            this.scaleYCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', scale1newH.toDevicePixel());
-            this.scaleYUpdateCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', scale1newH.toDevicePixel());
+            this.mainCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', toDevicePixel(scale1newH));
+            this.mainUpdateCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', toDevicePixel(scale1newH));
+            this.scaleYCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', toDevicePixel(scale1newH));
+            this.scaleYUpdateCanvasMap[scale1].style('height', `${scale1newH}px`).attr('height', toDevicePixel(scale1newH));
             // scale 2
-            this.mainCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', scale2newH.toDevicePixel());
-            this.mainUpdateCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', scale2newH.toDevicePixel());
-            this.scaleYCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', scale2newH.toDevicePixel());
-            this.scaleYUpdateCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', scale2newH.toDevicePixel());
+            this.mainCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', toDevicePixel(scale2newH));
+            this.mainUpdateCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', toDevicePixel(scale2newH));
+            this.scaleYCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', toDevicePixel(scale2newH));
+            this.scaleYUpdateCanvasMap[scale2].style('height', `${scale2newH}px`).attr('height', toDevicePixel(scale2newH));
 
             // ask to redaw the main canvas
             this.redrawMainCanvas();
@@ -246,10 +266,10 @@ export class TradingChart {
 
     // append x scale
     const tr = this.table
-      .append('tr').attr('style', `
+      .append('tr').attr('style', trimLines(`
         border-top: 1px solid ${this.settings.graphSeparatorColor};
-      `.trimLines())
-    const xdiv = tr.append('td').attr('style', `
+      `))
+    const xdiv = tr.append('td').attr('style', trimLines(`
         line-height: 0px;
         margin: 0;
         padding: 0;
@@ -258,14 +278,19 @@ export class TradingChart {
         overflow: hidden;
         width: ${chartSectionWidth}px;
         min-width: ${chartSectionWidth}px;
-      `.trimLines())
-      .append('div').attr('class', `xScaleContainer`).attr('style', `
+      `))
+      .append('div')
+      .attr('class', `xScaleContainer`)
+      .attr('style', trimLines(`
         width:100%;
         height:100%;
         position: relative;
         overflow: hidden;
-      `.trimLines())
-    this.scaleXCanvas = xdiv.append('canvas').attr('class', `scaleXCanvas`).attr('style', `
+      `))
+
+    this.scaleXCanvas = xdiv.append('canvas')
+      .attr('class', `scaleXCanvas`)
+      .attr('style', trimLines(`
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       width: ${chartSectionWidth}px;
@@ -273,8 +298,13 @@ export class TradingChart {
       position: absolute;
       left: 0px;
       top: 0px;
-    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel());
-    this.scaleXUpdateCanvas = xdiv.append('canvas').attr('class', `scaleXUpdateCanvas`).attr('style', `
+    `))
+      .attr('width', toDevicePixel(chartSectionWidth))
+      .attr('height', toDevicePixel(X_AXIS_HEIGHT_PX));
+
+    this.scaleXUpdateCanvas = xdiv.append('canvas')
+      .attr('class', `scaleXUpdateCanvas`)
+      .attr('style', trimLines(`
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       width: ${chartSectionWidth}px;
@@ -284,15 +314,17 @@ export class TradingChart {
       top: 0px;
       z-index: 1;
       cursor: ew-resize;
-    `.trimLines()).attr('width', chartSectionWidth.toDevicePixel()).attr('height', X_AXIS_HEIGHT_PX.toDevicePixel());
+    `))
+      .attr('width', toDevicePixel(chartSectionWidth))
+      .attr('height', toDevicePixel(X_AXIS_HEIGHT_PX));
 
     // place holder for botttom right corner
-    tr.append('td').attr('style', `
+    tr.append('td').attr('style', trimLines(`
       border-left: 1px solid ${this.settings.graphSeparatorColor};
       line-height: 0px;
       margin: 0;
       padding: 0;
-    `.trimLines());
+    `));
 
     // setup listeners for mouse.
     scaleIds.map(scaleId => {
@@ -347,7 +379,9 @@ export class TradingChart {
 
     // watermark
     if (this.settings.watermarkText) {
-      this.root.append('div').attr('class', 'watermark').attr('style', `
+      this.root.append('div')
+        .attr('class', 'watermark')
+        .attr('style', trimLines(`
         position: absolute;
         width: ${this.settings.width}px;
         height: ${this.settings.height}px;
@@ -357,10 +391,12 @@ export class TradingChart {
         font-size: 3rem;
         overflow: hidden;
         color: #00000012;
-      `.trimLines()).append('span').attr('style', 'white-space:break-spaces').html(this.settings.watermarkText);
+      `))
+        .append('span')
+        .attr('style', 'white-space:break-spaces')
+        .html(this.settings.watermarkText);
     }
 
-    debug(this);
   }
 
   /** Get a color pallet */
@@ -403,8 +439,8 @@ export class TradingChart {
     this.dataMat = xDomainValus.map(tsk => {
       return { ts: new Date(+tsk), data: dtgrouped[tsk] }
     });
-    // debug
-    debug(this.dataMat);
+
+    // debug(this.dataMat);
     this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
     this.updateWindowFromZoomPan();
     // draw main graph
@@ -528,7 +564,7 @@ export class TradingChart {
    */
   private redrawMainCanvas() {
     // If there is data then only main graph will be drawn
-    if (this.dataMat && this.dataMat.length) {
+    if (this.dataMat && this.dataMat.length && this.scaleXCanvas) {
       const windowedData = this.getWindowedData();
       // update scale domains
       this.updateDomains(windowedData);
@@ -714,7 +750,7 @@ export class TradingChart {
         // -----------------------------------START: Try to draw annotations------------------------------------------------
         const annotations = this.annotations.filter(a => ((a.scaleId === scaleId) || (typeof (a.scaleId) === 'undefined')));
         if (annotations && annotations.length > 0) {
-          debug('annotations', scaleId, annotations);
+          // debug('annotations', scaleId, annotations);
           const lineWidth = this.settings.annotationLineWidth;
           const annotationFontSize = this.settings.annotationFontSize;
           const xBandW = this.d3xScale.bandwidth();
@@ -764,76 +800,77 @@ export class TradingChart {
 
   /** Function responsible for redrawing update canvas for mouse positions and annotations on scales. */
   private redrawUpdateCanvas() {
-    try {
-      // calculate
-      const windowedData = this.getWindowedData();
-      const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
-      const xstep = this.d3xScale.step();
-      const bandW = this.d3xScale.bandwidth();
-      const domainVal = this.d3xScale.domain()[Math.floor((this.mousePosition?.x || 0).toDevicePixel() / xstep)]
-      const x = (this.d3xScale(domainVal) || 0) + bandW / 2;
-      if (xScaleCtx) {
-        const text = `  ${d3.timeFormat(this.settings.xScaleCrossHairFormat)(domainVal)}  `;
-        drawBoxFilledText(xScaleCtx, text, this.settings.crossHairColor, this.settings.crossHairContrastColor, x, 5, undefined, 0, undefined,
-          parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'center', 'top');
-        // drawText(xScaleCtx, text, x, 0, undefined, this.settings.crossHairContrastColor, this.settings.scaleFontSize, 'center', 'top')
-      }
-
-      Object.keys(this.config).map(scaleId => {
-        const canvas = this.mainUpdateCanvasMap[scaleId];
-        const ctx = canvas.node()?.getContext('2d');
-        const canvasWidth = +canvas.attr('width');
-        const canvasHeight = +canvas.attr('height');
-
-        if (ctx) {
-          drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
-          // draw only if this is the current scale subgraph
-          if (this.mousePosition?.scaleId === scaleId) {
-            const y = (this.mousePosition?.y || 0).toDevicePixel();
-            const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
-            const yformatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).crossHairYScaleFormat || this.settings.crossHairYScaleFormat)
-            const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
-            const yscalectx = yscalecanvas.node()?.getContext('2d');
-            const yscalecanvasWidth = +yscalecanvas.attr('width');
-            // draw y line
-            drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
-            if (yscalectx) {
-              // y scale drawing
-              drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
-                0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, yscalecanvasWidth.toDevicePixel(), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
-            }
-          }
-          // render legends at the current x coordinates
-          const matData = windowedData.find(v => v.ts.getTime() === domainVal.getTime());
-          if (matData) {
-            const plots = Object.keys(this.config[scaleId]);
-            const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
-
-            if (plotVals.length > 0) {
-              const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
-              const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
-              const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
-              const legendMarginType = typeof (legendMargin);
-              const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
-              plotVals.map((plotLegendVal, i) => {
-                const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
-                const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o}   H ${plotLegendVal.d.d.h}   L ${plotLegendVal.d.d.l}   C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)} ${(typeof (plotLegendVal.d.baseY) !== 'undefined') ? `   BaseY: ${formatter(plotLegendVal.d.baseY)}` : ''}`;
-
-                switch (legendPosition) {
-                  case 'top-right':
-                    drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
-                    break;
-
-                  case 'top-left':
-                    drawText(ctx, legendText, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], y, undefined, plotLegendVal.d.color, legendFontSize, 'left', 'top');
-                    break;
-                }
-              });
-            }
-          }
+    if (this.scaleXUpdateCanvas)
+      try {
+        // calculate
+        const windowedData = this.getWindowedData();
+        const xScaleCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
+        const xstep = this.d3xScale.step();
+        const bandW = this.d3xScale.bandwidth();
+        const domainVal = this.d3xScale.domain()[Math.floor(toDevicePixel(this.mousePosition?.x || 0) / xstep)]
+        const x = (this.d3xScale(domainVal) || 0) + bandW / 2;
+        if (xScaleCtx) {
+          const text = `  ${d3.timeFormat(this.settings.xScaleCrossHairFormat)(domainVal)}  `;
+          drawBoxFilledText(xScaleCtx, text, this.settings.crossHairColor, this.settings.crossHairContrastColor, x, 5, undefined, 0, undefined,
+            parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'center', 'top');
+          // drawText(xScaleCtx, text, x, 0, undefined, this.settings.crossHairContrastColor, this.settings.scaleFontSize, 'center', 'top')
         }
-      })
-    } catch (e) { log(e); }
+
+        Object.keys(this.config).map(scaleId => {
+          const canvas = this.mainUpdateCanvasMap[scaleId];
+          const ctx = canvas.node()?.getContext('2d');
+          const canvasWidth = +canvas.attr('width');
+          const canvasHeight = +canvas.attr('height');
+
+          if (ctx) {
+            drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[x, 0], [x, canvasHeight]]);
+            // draw only if this is the current scale subgraph
+            if (this.mousePosition?.scaleId === scaleId) {
+              const y = toDevicePixel(this.mousePosition?.y || 0);
+              const ydomainVal = this.d3yScaleMap[scaleId].invert(y);
+              const yformatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).crossHairYScaleFormat || this.settings.crossHairYScaleFormat)
+              const yscalecanvas = this.scaleYUpdateCanvasMap[scaleId];
+              const yscalectx = yscalecanvas.node()?.getContext('2d');
+              const yscalecanvasWidth = +yscalecanvas.attr('width');
+              // draw y line
+              drawLine(ctx, this.settings.crossHairColor, 'dotted-line', this.settings.crossHairWidth, [[0, y], [canvasWidth, y]]);
+              if (yscalectx) {
+                // y scale drawing
+                drawBoxFilledText(yscalectx, yformatter(ydomainVal), this.settings.crossHairColor, this.settings.crossHairContrastColor, 5, y,
+                  0, y - parseInt(this.settings.scaleFontSize) / 2 - 5, toDevicePixel(yscalecanvasWidth), parseInt(this.settings.scaleFontSize) + 10, this.settings.scaleFontSize, 'left', 'middle');
+              }
+            }
+            // render legends at the current x coordinates
+            const matData = windowedData.find(v => v.ts.getTime() === domainVal.getTime());
+            if (matData) {
+              const plots = Object.keys(this.config[scaleId]);
+              const plotVals = plots.map(plot => ((matData.data[scaleId] || {})[plot] || {})).map((d, i) => ({ name: plots[i], d }));
+
+              if (plotVals.length > 0) {
+                const legendFontSize = ((this.settings.subGraph || {})[scaleId] || {}).legendFontSize || this.settings.legendFontSize;
+                const legendPosition = ((this.settings.subGraph || {})[scaleId] || {}).legendPosition || this.settings.legendPosition || 'top-left';
+                const legendMargin = ((this.settings.subGraph || {})[scaleId] || {}).legendMargin || this.settings.legendMargin || [10, 10, 10];
+                const legendMarginType = typeof (legendMargin);
+                const formatter = d3.format(((this.settings.subGraph || {})[scaleId] || {}).legendFormat || this.settings.legendFormat);
+                plotVals.map((plotLegendVal, i) => {
+                  const y = (i + 1) * (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[0]) + (i * parseInt(legendFontSize));
+                  const legendText = typeof (plotLegendVal.d.d) === 'object' ? `O ${plotLegendVal.d.d.o}   H ${plotLegendVal.d.d.h}   L ${plotLegendVal.d.d.l}   C ${plotLegendVal.d.d.c}` : `${plotLegendVal.name}: ${formatter(plotLegendVal.d.d)} ${(typeof (plotLegendVal.d.baseY) !== 'undefined') ? `   BaseY: ${formatter(plotLegendVal.d.baseY)}` : ''}`;
+
+                  switch (legendPosition) {
+                    case 'top-right':
+                      drawText(ctx, legendText, canvasWidth - (legendMarginType === 'number' ? legendMargin : (legendMargin as any)[2]), y, undefined, plotLegendVal.d.color, legendFontSize, 'right', 'top');
+                      break;
+
+                    case 'top-left':
+                      drawText(ctx, legendText, legendMarginType === 'number' ? legendMargin : (legendMargin as any)[1], y, undefined, plotLegendVal.d.color, legendFontSize, 'left', 'top');
+                      break;
+                  }
+                });
+              }
+            }
+          }
+        })
+      } catch (e) { log(e); }
   }
 
   /**
@@ -854,17 +891,20 @@ export class TradingChart {
       const yScalecanvasHeight = +yScalecanvas.attr('height');
       if (yScalecanvasCtx) clearCanvas(yScalecanvasCtx, 0, 0, yScalecanvasWidth, yScalecanvasHeight);
     });
-    const xScalecanvasCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
-    const xScalecanvasWidth = +this.scaleXUpdateCanvas.attr('width');
-    const xScalecanvasHeight = +this.scaleXUpdateCanvas.attr('height');
-    if (xScalecanvasCtx) clearCanvas(xScalecanvasCtx, 0, 0, xScalecanvasWidth, xScalecanvasHeight);
+    if (this.scaleXUpdateCanvas) {
+      const xScalecanvasCtx = this.scaleXUpdateCanvas.node()?.getContext('2d');
+      const xScalecanvasWidth = +this.scaleXUpdateCanvas.attr('width');
+      const xScalecanvasHeight = +this.scaleXUpdateCanvas.attr('height');
+      if (xScalecanvasCtx) clearCanvas(xScalecanvasCtx, 0, 0, xScalecanvasWidth, xScalecanvasHeight);
+    }
   }
 
   /**
    * Detach the chart root from DOM.
    */
   public detach() {
-    this.root.remove();
+    if (this.root)
+      this.root.remove();
     this.zoomEventEmitter.removeAllListeners();
     this.panEventEmitter.removeAllListeners();
   }
@@ -873,8 +913,10 @@ export class TradingChart {
    * Attach to given DOM root node
    */
   public attach(domRoot: HTMLElement) {
-    const _root = this.root.node();
-    if (_root) domRoot.appendChild(_root);
+    if (this.root) {
+      const _root = this.root.node();
+      if (_root) domRoot.appendChild(_root);
+    }
   }
 
 
