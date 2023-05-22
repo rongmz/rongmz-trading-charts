@@ -158,7 +158,7 @@ export interface ChartSettings extends SubGraphSettings {
   annotationFontSize: string,
   /** Individual settings for each scale sections */
   subGraph: {
-    [scaleId: string]: SubGraphSettings
+    [scaleId: string]: Partial<SubGraphSettings>
   }
 }
 

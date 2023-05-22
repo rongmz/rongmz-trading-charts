@@ -20,6 +20,7 @@ export class TradingChart {
   private dataWindowStartIndex?: number;
   private dataWindowEndIndex?: number;
 
+  private config: ChartConfig;
   private settings: ChartSettings;
   /** Chart root element provided as container */
   private root: d3.Selection<HTMLDivElement, any, any, any> | undefined = undefined;
@@ -60,8 +61,9 @@ export class TradingChart {
    * @param config Data based config for the entire chart
    * @param settings Cosmetic settings for the chart
    */
-  constructor(public readonly config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
-    const scaleIds = Object.keys(config);
+  constructor(_config: ChartConfig, _settings: Partial<ChartSettings>, theme?: 'light' | 'dark') {
+    this.config = _config;
+    const scaleIds = Object.keys(_config);
 
     // save settings
     this.settings = Object.assign({},
@@ -397,6 +399,38 @@ export class TradingChart {
         .html(this.settings.watermarkText);
     }
 
+  }
+
+  /**
+   * Dynamically update config for this Chart.
+   * It also re initializes everything.
+   * @param _config
+   */
+  public setConfig(_config: ChartConfig) {
+    // detach
+    this.detach();
+    this.config = _config;
+    // change the subgraph ratio
+    this.settings.scaleSectionRatio = 1 / Object.keys(_config).length;
+    if (this.settings.subGraph) {
+      Object.keys(this.settings.subGraph).map(sid => {
+        delete this.settings.subGraph[sid].scaleSectionRatio;
+      })
+    }
+    this.initialize();
+  }
+
+  /**
+   * Dynamically update the chart theme.
+   * It re initializes the chart.
+   * @param theme
+   */
+  public updateTheme(theme: 'light' | 'dark') {
+    // save settings
+    this.settings = Object.assign({}, this.settings,
+      (theme === 'dark' ? DarkThemeChartSettings : LightThemeChartSettings)) as ChartSettings;
+    this.detach();
+    this.initialize();
   }
 
   /** Get a color pallet */
