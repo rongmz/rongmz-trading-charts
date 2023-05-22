@@ -652,16 +652,18 @@ export class TradingChart {
           const plotConfig = subgraphConfig[plotName];
           const subGraphSettings = (this.settings.subGraph || {})[scaleId] || {};
           const bandW = this.d3xScale.bandwidth();
-          const filteredWindowedData = windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName]));
+          const filteredWindowedData = windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName] && typeof (d.data[scaleId][plotName].d) !== 'undefined'));
           switch (plotConfig.type) {
 
             //--------------Candle plot------------
             case 'candle':
               filteredWindowedData.map(d => {
                 const _d = d.data[scaleId][plotName];
-                const _c = _d.d as CandlePlotData;
-                const x = this.d3xScale(d.ts) as number;
-                drawCandle(mainCanvasCtx, _d.color, x, d3yScale(_c.o), d3yScale(_c.c), x + bandW / 2, d3yScale(_c.h), d3yScale(_c.l), bandW)
+                if (typeof (_d.d) !== 'undefined') {
+                  const _c = _d.d as CandlePlotData;
+                  const x = this.d3xScale(d.ts) as number;
+                  drawCandle(mainCanvasCtx, _d.color, x, d3yScale(_c.o), d3yScale(_c.c), x + bandW / 2, d3yScale(_c.h), d3yScale(_c.l), bandW)
+                }
               });
               break;
 
@@ -669,7 +671,7 @@ export class TradingChart {
             case 'dashed-line':
             case 'dotted-line':
             case 'solid-line':
-              drawLine(mainCanvasCtx, windowedData[windowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
+              drawLine(mainCanvasCtx, filteredWindowedData[filteredWindowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
                 (subGraphSettings.lineWidth || this.settings.lineWidth), filteredWindowedData.map(d => {
                   const _d = d.data[scaleId][plotName];
                   const x = this.d3xScale(d.ts) as number;
@@ -701,7 +703,7 @@ export class TradingChart {
 
             //--------------area plot------------
             case 'area':
-              const color = d3.color(windowedData[windowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
+              const color = d3.color(filteredWindowedData[filteredWindowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
               const areaColor = plotConfig.areaColor ? [plotConfig.areaColor, plotConfig.areaColor] : [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()];
               drawArea(mainCanvasCtx, color.formatHex8(), plotConfig.colorBaseY, (subGraphSettings.lineWidth || this.settings.lineWidth),
                 areaColor, filteredWindowedData.map(d => {
