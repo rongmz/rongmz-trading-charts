@@ -57,6 +57,7 @@ export class TradingChart {
 
   /**
    * Instantiate a TradingChart
+   * NO AUTO INITIALIZATION.
    * @param root the element under which the chart will be rendered. The styling of the root element won't be manipulated.
    * @param config Data based config for the entire chart
    * @param settings Cosmetic settings for the chart
@@ -70,8 +71,6 @@ export class TradingChart {
       (theme === 'dark' ? DarkThemeChartSettings : LightThemeChartSettings),
       _settings, { scaleSectionRatio: (1 / scaleIds.length) }) as ChartSettings;
 
-    // auto Initialize at first
-    this.initialize();
     debug(this);
   }
 
@@ -403,12 +402,10 @@ export class TradingChart {
 
   /**
    * Dynamically update config for this Chart.
-   * It also re initializes everything.
+   * NO AUTO INITIALIZATION.
    * @param _config
    */
   public setConfig(_config: ChartConfig) {
-    // detach
-    this.detach();
     this.config = _config;
     // change the subgraph ratio
     this.settings.scaleSectionRatio = 1 / Object.keys(_config).length;
@@ -417,20 +414,17 @@ export class TradingChart {
         delete this.settings.subGraph[sid].scaleSectionRatio;
       })
     }
-    this.initialize();
   }
 
   /**
    * Dynamically update the chart theme.
-   * It re initializes the chart.
+   * NO AUTO INITIALIZATION.
    * @param theme
    */
   public updateTheme(theme: 'light' | 'dark') {
     // save settings
     this.settings = Object.assign({}, this.settings,
       (theme === 'dark' ? DarkThemeChartSettings : LightThemeChartSettings)) as ChartSettings;
-    this.detach();
-    this.initialize();
   }
 
   /** Get a color pallet */
