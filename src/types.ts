@@ -290,7 +290,7 @@ export type ZoomPanListenerType = () => void
 export const EVENT_ZOOM = 'onzoom';
 export const EVENT_PAN = 'onpan';
 
-export type AnnotationType = 'xRange' | 'flag' | 'rect'
+export type AnnotationType = 'xRange' | 'xSingle' | 'flag' | 'rect'
 
 export interface Annotation {
   /** Annotation type */

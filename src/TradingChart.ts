@@ -3,11 +3,11 @@ import { EventEmitter } from 'events';
 import {
   Annotation, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings, EVENT_PAN, EVENT_ZOOM,
   GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, log
+  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, error, log
 } from './types';
 import {
   clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawFlagMark, drawLine,
-  drawRectLimiterMark, drawText, drawXRange
+  drawRectLimiterMark, drawText, drawXRange, drawXSingle
 } from './utils';
 
 const trimLines = (string: string) => string.replace(/\n\s+/g, '');
@@ -792,6 +792,10 @@ export class TradingChart {
                 if (x.length > 1) drawXRange(mainCanvasCtx, x[0], x[1], canvasHeight, annotation.color, lineWidth, annotation.areaColor, annotation.text, annotationFontSize);
                 break;
 
+              case 'xSingle':
+                if (x.length > 0) drawXSingle(mainCanvasCtx, x[0] + xBandW/2, canvasHeight, annotation.color, lineWidth, annotation.text, annotationFontSize);
+                break;
+
               case 'flag':
                 x.map((x, i) => {
                   drawFlagMark(mainCanvasCtx, x + xBandW / 2, y[i], annotation.text, annotation.direction, annotation.color, annotation.textColor, annotationFontSize);
@@ -815,13 +819,26 @@ export class TradingChart {
         drawText(xScaleCanvasCtx, xScaleFormat(d), x, xscaleY, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
       });
 
-      // -------------------Draw for only xrange annotations to xscale-------------------------------
-      this.annotations.filter(a => (a.type === 'xRange' && a.x.length > 1)).map(annotation => {
-        const x = annotation.x.map(_ => this.d3xScale(_) as number);
-        const txt = annotation.x.map(_ => xScaleFormat(_));
-        const rh = parseInt(this.settings.annotationFontSize);
-        drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
-        drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+      // -------------------Draw for only xrange and xSingle annotations to xscale-------------------------------
+      this.annotations.filter(a => ((a.type === 'xRange' || a.type === 'xSingle') && a.x.length > 0)).map(annotation => {
+        try {
+          const x = annotation.x.map(_ => this.d3xScale(_) as number);
+          const txt = annotation.x.map(_ => xScaleFormat(_));
+          const rh = parseInt(this.settings.annotationFontSize);
+          switch (annotation.type) {
+            case 'xRange':
+              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
+              drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+              break;
+
+            case 'xSingle':
+              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0]+this.d3xScale.bandwidth()/2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
+              break;
+          }
+
+        } catch (e) {
+          error('Error while drawing annotation', e);
+        }
       })
 
     }
