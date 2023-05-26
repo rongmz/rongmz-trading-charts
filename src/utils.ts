@@ -323,7 +323,7 @@ export function drawXSingle(
   lineColor: string,
   lineWidth: number,
   text?: string,
-  fontSize?: string,
+  fontSize?: string
 ) {
   if (context !== null) {
     context.save();
@@ -337,11 +337,12 @@ export function drawXSingle(
     context.stroke();
 
     if (typeof (text) !== 'undefined' && !!fontSize) {
-      context.textAlign = 'center';
-      context.textBaseline = 'top';
-      context.font = fontSize;
-      context.fillStyle = lineColor;
-      context.fillText(text, x, 10);
+      drawCenterPivotRotatedText(context, text, x - parseInt(fontSize) / 2 - 5, h / 2, -90, lineColor, fontSize);
+      // context.textAlign = 'center';
+      // context.textBaseline = 'top';
+      // context.font = fontSize;
+      // context.fillStyle = lineColor;
+      // context.fillText(text, x, 10);
     }
     context.restore();
   }
