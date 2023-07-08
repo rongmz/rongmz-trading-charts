@@ -53,6 +53,7 @@ export class TradingChart {
 
   private annotations: Annotation[] = [];
 
+  private data: GraphData = {};
 
 
   /**
@@ -439,40 +440,47 @@ export class TradingChart {
    * @param data
    */
   public setData(_data: GraphData) {
-    // extract grouped data
-    const dtgrouped = Object.keys(this.config).reduce((rv, scaleId) => {
-      const subgraph = this.config[scaleId];
-      Object.keys(subgraph).map((plotName, i) => {
-        const plotConf = subgraph[plotName];
-        const d = _data[plotConf.dataId] || [];
-        const colorpallet = this.getColorPallet(scaleId);
-        const defaultColor = colorpallet[i % colorpallet.length];
-        let lastBaseY: number | undefined = undefined;
-        // loop thourgh d
-        d.map(d => {
-          const ts = plotConf.tsValue(d);
-          const data = plotConf.data(d);
-          const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
-          const baseY = (typeof (plotConf.baseY) === 'undefined') ? lastBaseY : (typeof (plotConf.baseY) === 'function' ? plotConf.baseY(d) : plotConf.baseY);
-          lastBaseY = baseY; // replace last
-          if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color, baseY } } };
-          else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color, baseY } };
-          else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color, baseY };
-        })
-      });
-      return rv;
-    }, {} as any);
-    // save data mat
-    const xDomainValus = Object.keys(dtgrouped).sort((a, b) => ((+a) - (+b)));
-    this.dataMat = xDomainValus.map(tsk => {
-      return { ts: new Date(+tsk), data: dtgrouped[tsk] }
-    });
-
+    this.data = _data;
+    this.recalculateData();
     // debug(this.dataMat);
     this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
     this.updateWindowFromZoomPan();
     // draw main graph
     this.redrawMainCanvas();
+  }
+
+  /** This is a internal function which re-calculates all data points */
+  private recalculateData() {
+    if (this.data && Object.keys(this.data).length > 0) {
+      // extract grouped data
+      const dtgrouped = Object.keys(this.config).reduce((rv, scaleId) => {
+        const subgraph = this.config[scaleId];
+        Object.keys(subgraph).map((plotName, i) => {
+          const plotConf = subgraph[plotName];
+          const d = this.data[plotConf.dataId] || [];
+          const colorpallet = this.getColorPallet(scaleId);
+          const defaultColor = colorpallet[i % colorpallet.length];
+          let lastBaseY: number | undefined = undefined;
+          // loop thourgh d
+          d.map(d => {
+            const ts = plotConf.tsValue(d);
+            const data = plotConf.data(d);
+            const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
+            const baseY = (typeof (plotConf.baseY) === 'undefined') ? lastBaseY : (typeof (plotConf.baseY) === 'function' ? plotConf.baseY(d) : plotConf.baseY);
+            lastBaseY = baseY; // replace last
+            if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color, baseY } } };
+            else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color, baseY } };
+            else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color, baseY };
+          })
+        });
+        return rv;
+      }, {} as any);
+      // save data mat
+      const xDomainValus = Object.keys(dtgrouped).sort((a, b) => ((+a) - (+b)));
+      this.dataMat = xDomainValus.map(tsk => {
+        return { ts: new Date(+tsk), data: dtgrouped[tsk] }
+      });
+    }
   }
 
   /**
@@ -546,6 +554,7 @@ export class TradingChart {
    * @param _settings
    */
   public updateSettings(_settings: Partial<ChartSettings>) {
+    this.recalculateData();
     this.settings = Object.assign(this.settings || {}, _settings) as ChartSettings;
     // ask for redraw
     this.updateWindowFromZoomPan();
@@ -793,7 +802,7 @@ export class TradingChart {
                 break;
 
               case 'xSingle':
-                if (x.length > 0) drawXSingle(mainCanvasCtx, x[0] + xBandW/2, canvasHeight, annotation.color, lineWidth, annotation.text, annotationFontSize);
+                if (x.length > 0) drawXSingle(mainCanvasCtx, x[0] + xBandW / 2, canvasHeight, annotation.color, lineWidth, annotation.text, annotationFontSize);
                 break;
 
               case 'flag':
@@ -832,7 +841,7 @@ export class TradingChart {
               break;
 
             case 'xSingle':
-              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0]+this.d3xScale.bandwidth()/2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
+              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0] + this.d3xScale.bandwidth() / 2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
               break;
           }
 
