@@ -599,7 +599,7 @@ export class TradingChart {
    * Function which redraws the main canvas and corresponding scales
    * Main canvas will be redrawn for zoom, panning, section resize etc.
    */
-  private redrawMainCanvas() {
+  public redrawMainCanvas() {
     // If there is data then only main graph will be drawn
     if (this.dataMat && this.dataMat.length && this.scaleXCanvas) {
       const windowedData = this.getWindowedData();
