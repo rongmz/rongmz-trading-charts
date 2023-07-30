@@ -8,6 +8,13 @@
     "y": []
   },
   {
+    "type": "xSingle",
+    "text": "Single X Mark",
+    "color": "#e41a1c",
+    "x": ["2023-04-19T12:57:00+0530"],
+    "y": []
+  },
+  {
     "type": "flag",
     "scaleId": "candle",
     "text": "A",

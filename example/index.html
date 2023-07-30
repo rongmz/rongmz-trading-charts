@@ -110,6 +110,7 @@
             console.log('annotations json=', data);
             chart.setAnnotations(data);
           });
+          chart.initialize();
         // attach the chart
         chart.attach(document.getElementById('root'));
       }

@@ -306,6 +306,50 @@ export function drawXRange(
 
 
 /**
+ * Draw x Single annotation
+ * @param context
+ * @param x1
+ * @param x2
+ * @param h
+ * @param lineColor
+ * @param lineWidth
+ * @param areaColor
+ * @param text
+ */
+export function drawXSingle(
+  context: CanvasRenderingContext2D | null,
+  x: number,
+  h: number,
+  lineColor: string,
+  lineWidth: number,
+  text?: string,
+  fontSize?: string
+) {
+  if (context !== null) {
+    context.save();
+    context.lineWidth = lineWidth;
+    context.strokeStyle = lineColor;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, h);
+    context.stroke();
+
+    if (typeof (text) !== 'undefined' && !!fontSize) {
+      drawCenterPivotRotatedText(context, text, x - parseInt(fontSize) / 2 - 5, h / 2, -90, lineColor, fontSize);
+      // context.textAlign = 'center';
+      // context.textBaseline = 'top';
+      // context.font = fontSize;
+      // context.fillStyle = lineColor;
+      // context.fillText(text, x, 10);
+    }
+    context.restore();
+  }
+}
+
+
+/**
  * Draw a Flag mark in the given chart context
  * @param context
  * @param x

@@ -3,11 +3,11 @@ import { EventEmitter } from 'events';
 import {
   Annotation, CandlePlotData, CanvasMap, ChartConfig, ChartSettings, D3YScaleMap, DarkThemeChartSettings, EVENT_PAN, EVENT_ZOOM,
   GraphData, GraphDataMat, Interpolator, LightThemeChartSettings, MIN_ZOOM_POINTS, MouseDownPosition, MousePosition, PlotLineType, ScaleRowMap,
-  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, log
+  X_AXIS_HEIGHT_PX, ZoomPanListenerType, ZoomPanType, debug, error, log
 } from './types';
 import {
   clearCanvas, drawArea, drawBar, drawBoxFilledText, drawCandle, drawCenterPivotRotatedText, drawFlagMark, drawLine,
-  drawRectLimiterMark, drawText, drawXRange
+  drawRectLimiterMark, drawText, drawXRange, drawXSingle
 } from './utils';
 
 const trimLines = (string: string) => string.replace(/\n\s+/g, '');
@@ -53,6 +53,7 @@ export class TradingChart {
 
   private annotations: Annotation[] = [];
 
+  private data: GraphData = {};
 
 
   /**
@@ -439,40 +440,47 @@ export class TradingChart {
    * @param data
    */
   public setData(_data: GraphData) {
-    // extract grouped data
-    const dtgrouped = Object.keys(this.config).reduce((rv, scaleId) => {
-      const subgraph = this.config[scaleId];
-      Object.keys(subgraph).map((plotName, i) => {
-        const plotConf = subgraph[plotName];
-        const d = _data[plotConf.dataId] || [];
-        const colorpallet = this.getColorPallet(scaleId);
-        const defaultColor = colorpallet[i % colorpallet.length];
-        let lastBaseY: number | undefined = undefined;
-        // loop thourgh d
-        d.map(d => {
-          const ts = plotConf.tsValue(d);
-          const data = plotConf.data(d);
-          const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
-          const baseY = (typeof (plotConf.baseY) === 'undefined') ? lastBaseY : (typeof (plotConf.baseY) === 'function' ? plotConf.baseY(d) : plotConf.baseY);
-          lastBaseY = baseY; // replace last
-          if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color, baseY } } };
-          else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color, baseY } };
-          else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color, baseY };
-        })
-      });
-      return rv;
-    }, {} as any);
-    // save data mat
-    const xDomainValus = Object.keys(dtgrouped).sort((a, b) => ((+a) - (+b)));
-    this.dataMat = xDomainValus.map(tsk => {
-      return { ts: new Date(+tsk), data: dtgrouped[tsk] }
-    });
-
+    this.data = _data;
+    this.recalculateData();
     // debug(this.dataMat);
     this.zoomInterpolator = d3.interpolateNumber(this.dataMat.length, MIN_ZOOM_POINTS)
     this.updateWindowFromZoomPan();
     // draw main graph
     this.redrawMainCanvas();
+  }
+
+  /** This is a internal function which re-calculates all data points */
+  private recalculateData() {
+    if (this.data && Object.keys(this.data).length > 0) {
+      // extract grouped data
+      const dtgrouped = Object.keys(this.config).reduce((rv, scaleId) => {
+        const subgraph = this.config[scaleId];
+        Object.keys(subgraph).map((plotName, i) => {
+          const plotConf = subgraph[plotName];
+          const d = this.data[plotConf.dataId] || [];
+          const colorpallet = this.getColorPallet(scaleId);
+          const defaultColor = colorpallet[i % colorpallet.length];
+          let lastBaseY: number | undefined = undefined;
+          // loop thourgh d
+          d.map(d => {
+            const ts = plotConf.tsValue(d);
+            const data = plotConf.data(d);
+            const color = (plotConf.color) ? (typeof (plotConf.color) === 'function' ? plotConf.color(d) : plotConf.color) : defaultColor;
+            const baseY = (typeof (plotConf.baseY) === 'undefined') ? lastBaseY : (typeof (plotConf.baseY) === 'function' ? plotConf.baseY(d) : plotConf.baseY);
+            lastBaseY = baseY; // replace last
+            if (!rv[ts.getTime()]) rv[ts.getTime()] = { [scaleId]: { [plotName]: { d: data, color, baseY } } };
+            else if (!rv[ts.getTime()][scaleId]) rv[ts.getTime()][scaleId] = { [plotName]: { d: data, color, baseY } };
+            else if (!rv[ts.getTime()][scaleId][plotName]) rv[ts.getTime()][scaleId][plotName] = { d: data, color, baseY };
+          })
+        });
+        return rv;
+      }, {} as any);
+      // save data mat
+      const xDomainValus = Object.keys(dtgrouped).sort((a, b) => ((+a) - (+b)));
+      this.dataMat = xDomainValus.map(tsk => {
+        return { ts: new Date(+tsk), data: dtgrouped[tsk] }
+      });
+    }
   }
 
   /**
@@ -546,6 +554,7 @@ export class TradingChart {
    * @param _settings
    */
   public updateSettings(_settings: Partial<ChartSettings>) {
+    this.recalculateData();
     this.settings = Object.assign(this.settings || {}, _settings) as ChartSettings;
     // ask for redraw
     this.updateWindowFromZoomPan();
@@ -652,16 +661,18 @@ export class TradingChart {
           const plotConfig = subgraphConfig[plotName];
           const subGraphSettings = (this.settings.subGraph || {})[scaleId] || {};
           const bandW = this.d3xScale.bandwidth();
-          const filteredWindowedData = windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName]));
+          const filteredWindowedData = windowedData.filter(d => (d.data[scaleId] && d.data[scaleId][plotName] && typeof (d.data[scaleId][plotName].d) !== 'undefined'));
           switch (plotConfig.type) {
 
             //--------------Candle plot------------
             case 'candle':
               filteredWindowedData.map(d => {
                 const _d = d.data[scaleId][plotName];
-                const _c = _d.d as CandlePlotData;
-                const x = this.d3xScale(d.ts) as number;
-                drawCandle(mainCanvasCtx, _d.color, x, d3yScale(_c.o), d3yScale(_c.c), x + bandW / 2, d3yScale(_c.h), d3yScale(_c.l), bandW)
+                if (typeof (_d.d) !== 'undefined') {
+                  const _c = _d.d as CandlePlotData;
+                  const x = this.d3xScale(d.ts) as number;
+                  drawCandle(mainCanvasCtx, _d.color, x, d3yScale(_c.o), d3yScale(_c.c), x + bandW / 2, d3yScale(_c.h), d3yScale(_c.l), bandW)
+                }
               });
               break;
 
@@ -669,7 +680,7 @@ export class TradingChart {
             case 'dashed-line':
             case 'dotted-line':
             case 'solid-line':
-              drawLine(mainCanvasCtx, windowedData[windowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
+              drawLine(mainCanvasCtx, filteredWindowedData[filteredWindowedData.length - 1].data[scaleId][plotName].color, plotConfig.type as PlotLineType,
                 (subGraphSettings.lineWidth || this.settings.lineWidth), filteredWindowedData.map(d => {
                   const _d = d.data[scaleId][plotName];
                   const x = this.d3xScale(d.ts) as number;
@@ -701,7 +712,7 @@ export class TradingChart {
 
             //--------------area plot------------
             case 'area':
-              const color = d3.color(windowedData[windowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
+              const color = d3.color(filteredWindowedData[filteredWindowedData.length - 1].data[scaleId][plotName].color) as d3.RGBColor | d3.HSLColor;
               const areaColor = plotConfig.areaColor ? [plotConfig.areaColor, plotConfig.areaColor] : [color.copy({ opacity: 0.6 }).formatHex8(), color.copy({ opacity: 0.2 }).formatHex8()];
               drawArea(mainCanvasCtx, color.formatHex8(), plotConfig.colorBaseY, (subGraphSettings.lineWidth || this.settings.lineWidth),
                 areaColor, filteredWindowedData.map(d => {
@@ -790,6 +801,10 @@ export class TradingChart {
                 if (x.length > 1) drawXRange(mainCanvasCtx, x[0], x[1], canvasHeight, annotation.color, lineWidth, annotation.areaColor, annotation.text, annotationFontSize);
                 break;
 
+              case 'xSingle':
+                if (x.length > 0) drawXSingle(mainCanvasCtx, x[0] + xBandW / 2, canvasHeight, annotation.color, lineWidth, annotation.text, annotationFontSize);
+                break;
+
               case 'flag':
                 x.map((x, i) => {
                   drawFlagMark(mainCanvasCtx, x + xBandW / 2, y[i], annotation.text, annotation.direction, annotation.color, annotation.textColor, annotationFontSize);
@@ -813,13 +828,26 @@ export class TradingChart {
         drawText(xScaleCanvasCtx, xScaleFormat(d), x, xscaleY, 0, this.settings.scaleFontColor, this.settings.scaleFontSize, 'left');
       });
 
-      // -------------------Draw for only xrange annotations to xscale-------------------------------
-      this.annotations.filter(a => (a.type === 'xRange' && a.x.length > 1)).map(annotation => {
-        const x = annotation.x.map(_ => this.d3xScale(_) as number);
-        const txt = annotation.x.map(_ => xScaleFormat(_));
-        const rh = parseInt(this.settings.annotationFontSize);
-        drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
-        drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+      // -------------------Draw for only xrange and xSingle annotations to xscale-------------------------------
+      this.annotations.filter(a => ((a.type === 'xRange' || a.type === 'xSingle') && a.x.length > 0)).map(annotation => {
+        try {
+          const x = annotation.x.map(_ => this.d3xScale(_) as number);
+          const txt = annotation.x.map(_ => xScaleFormat(_));
+          const rh = parseInt(this.settings.annotationFontSize);
+          switch (annotation.type) {
+            case 'xRange':
+              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
+              drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+              break;
+
+            case 'xSingle':
+              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0] + this.d3xScale.bandwidth() / 2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
+              break;
+          }
+
+        } catch (e) {
+          error('Error while drawing annotation', e);
+        }
       })
 
     }
