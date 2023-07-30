@@ -426,6 +426,8 @@ export class TradingChart {
     // save settings
     this.settings = Object.assign({}, this.settings,
       (theme === 'dark' ? DarkThemeChartSettings : LightThemeChartSettings)) as ChartSettings;
+    // draw main graph
+    this.redrawMainCanvas();
   }
 
   /** Get a color pallet */
