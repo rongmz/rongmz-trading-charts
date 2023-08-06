@@ -536,6 +536,32 @@ export class TradingChart {
   }
 
   /**
+   * Set zoom level and pan based on calculated start and end
+   * @param start
+   * @param end
+   */
+  public zoomPanToRange(start: Date, end: Date) {
+    if (this.dataMat && this.dataMat.length > 0) {
+      const [i1, i2] = this.dataMat.reduce((rv, mat, i) => {
+        if (mat.ts.getTime() <= start.getTime()) rv[0] = Math.max(i - 1, 0); // update till ts == start or atleast before start.
+        if (mat.ts.getTime() <= end.getTime()) rv[1] = Math.min(i + 1, this.dataMat.length - 1); // update till ts == end or atleast before end
+        return rv;
+      }, [0, this.dataMat.length - 1]);
+      // got the window [i1, i2]
+      this.panOffset = i2;
+      this.dataWindowEndIndex = i2 - 1;
+      this.dataWindowStartIndex = i1;
+      const windowLength = this.dataWindowEndIndex - this.dataWindowStartIndex;
+      const zoomLevel = (windowLength - this.dataMat.length) / (MIN_ZOOM_POINTS - this.dataMat.length);
+      log(`Zoom level determined: ${zoomLevel}`);
+      this.settings.zoomLevel = zoomLevel;
+      this.redrawMainCanvas();
+      // call any listeners
+      this.zoomEventEmitter.emit(EVENT_ZOOM);
+    }
+  }
+
+  /**
    * Panning. positive dx for pan to see latest data at right hand side.
    * @param dx
    * @param dy
