@@ -858,7 +858,7 @@ export class TradingChart {
 
       // -------------------Draw for only xrange and xSingle annotations to xscale-------------------------------
       this.annotations.filter(a => ((a.type === 'xRange' || a.type === 'xSingle') && a.x.length > 0)).map(annotation => {
-        if (typeof (annotation.showXValue) === 'undefined' || annotation.showXValue) {
+        if (annotation.showXValue) {
           try {
             const x = annotation.x.map(_ => this.d3xScale(_) as number);
             const txt = annotation.x.map(_ => xScaleFormat(_));
