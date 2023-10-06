@@ -858,23 +858,25 @@ export class TradingChart {
 
       // -------------------Draw for only xrange and xSingle annotations to xscale-------------------------------
       this.annotations.filter(a => ((a.type === 'xRange' || a.type === 'xSingle') && a.x.length > 0)).map(annotation => {
-        try {
-          const x = annotation.x.map(_ => this.d3xScale(_) as number);
-          const txt = annotation.x.map(_ => xScaleFormat(_));
-          const rh = parseInt(this.settings.annotationFontSize);
-          switch (annotation.type) {
-            case 'xRange':
-              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
-              drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
-              break;
+        if (typeof (annotation.showXValue) === 'undefined' || annotation.showXValue) {
+          try {
+            const x = annotation.x.map(_ => this.d3xScale(_) as number);
+            const txt = annotation.x.map(_ => xScaleFormat(_));
+            const rh = parseInt(this.settings.annotationFontSize);
+            switch (annotation.type) {
+              case 'xRange':
+                drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0], 5, x[0], 0, undefined, rh + 10, this.settings.annotationFontSize, 'right', 'top');
+                drawBoxFilledText(xScaleCanvasCtx, txt[1], annotation.color, annotation.textColor, x[1], 5, x[1], 0, undefined, rh + 10, this.settings.annotationFontSize, 'left', 'top');
+                break;
 
-            case 'xSingle':
-              drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0] + this.d3xScale.bandwidth() / 2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
-              break;
+              case 'xSingle':
+                drawBoxFilledText(xScaleCanvasCtx, txt[0], annotation.color, annotation.textColor, x[0] + this.d3xScale.bandwidth() / 2, 5, undefined, 0, undefined, rh + 10, this.settings.annotationFontSize, 'center', 'top');
+                break;
+            }
+
+          } catch (e) {
+            error('Error while drawing annotation', e);
           }
-
-        } catch (e) {
-          error('Error while drawing annotation', e);
         }
       })
 

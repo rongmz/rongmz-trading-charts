@@ -310,5 +310,7 @@ export interface Annotation {
   /** The y values */
   y: number[],
   /** direction specially for flag type  (Optional) */
-  direction: 'up' | 'down'
+  direction: 'up' | 'down',
+  /** Whether to show x value */
+  showXValue?: boolean,
 }
